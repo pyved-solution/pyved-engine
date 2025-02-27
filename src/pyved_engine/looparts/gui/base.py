@@ -1,7 +1,7 @@
 from .BaseGuiElement import BaseGuiElement, ANCHOR_LEFT, ANCHOR_RIGHT, ANCHOR_CENTER
 from ... import dep_linking
 from ...compo import vscreen
-from ...foundation import events
+from ...abstraction import EvSystem as events
 
 
 pygame = dep_linking.pygame

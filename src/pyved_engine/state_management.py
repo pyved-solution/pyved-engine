@@ -1,15 +1,13 @@
 import time
 
+from . import pe_vars
 from ._classes import BaseGameState
 from .compo import vscreen
 from .custom_struct import Stack, StContainer, enum
-from .foundation import events
-from .foundation.events import EngineEvTypes  # latest version of event sys
-from . import pe_vars
+from .abstraction import EvSystem
 
-print(pe_vars)
 
-multistate_flag = False
+multistite_flag = False
 stack_based_ctrl = None
 state_stack = None
 _DefaultGsList = enum(
@@ -33,7 +31,7 @@ _default_st_mapping = {  # bind identifier to class
 }
 
 
-class StateStackCtrl(events.EvListener):
+class StateStackCtrl(EvSystem.EvListener):
     """
     used to manage the game state but also provide the very basic game_loop
     """
@@ -52,8 +50,6 @@ class StateStackCtrl(events.EvListener):
         self._st_container = StContainer()
         self._st_container.setup(self._gs_omega, adhoc_mapping, None)
         self.__state_stack = Stack()
-
-        self.gameover = False
 
     def get_state_by_code(self, k):
         return self._st_container.retrieve(k)
@@ -107,7 +103,9 @@ class StateStackCtrl(events.EvListener):
         print('>>>pushin a state on the stack')
 
     def on_gameover(self, ev):
-        self.gameover = True
+        print('poppin all')
+        while self.__state_stack.count() > 0:
+            self._pop_state()
 
     def on_state_change(self, ev):
         state_obj = self._st_container.retrieve(ev.state_ident)
@@ -128,12 +126,13 @@ class StateStackCtrl(events.EvListener):
         """
         print('*Warning! Never use .loop in the web Ctx*')
         self.turn_on()
+        e_types = EvSystem.EngineEvTypes
 
-        self.pev(events.EngineEvTypes.Gamestart)  # ensure we will call .enten() on the initial/eden state
-        while not (self.gameover or pe_vars.gameover):
+        self.pev(e_types.Gamestart)  # ensure we will call .enten() on the initial/eden state
+        while not pe_vars.gameover:
             infot = time.time()
-            self.pev(EngineEvTypes.Update, curr_t=infot)
-            self.pev(EngineEvTypes.Paint, screen=pe_vars.screen)
+            self.pev(e_types.Update, curr_t=infot)
+            self.pev(e_types.Paint, screen=pe_vars.screen)
             self._manager.update()
             vscreen.flip()
             self._clock.tick(pe_vars.max_fps)

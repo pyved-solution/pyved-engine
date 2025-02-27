@@ -17,8 +17,8 @@ from .EngineRouter import EngineRouter
 # from .compo import gfx
 # from .compo import vscreen  # deprecated
 from .compo.GameTpl import GameTpl  # legacy cls
-from .foundation import legacy_evs  # we just copy the event system of pygame
-from .foundation.events import Emitter, EvListener, EngineEvTypes
+# from .foundation import legacy_evs  # we just copy the event system of pygame
+from .abstraction.EvSystem import Emitter, EvListener, EngineEvTypes
 from . import pe_vars as defs
 
 

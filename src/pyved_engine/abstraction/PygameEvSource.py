@@ -1,12 +1,9 @@
-from .defs import EngineEvTypes, to_camelcase
-from .interfaces import BaseKenBackend
-# from .. import _hub
-from .. import pe_vars
-from .. import dep_linking
+from .DeepEvSource import DeepEvSource
+from ..pe_vars import EngineEvTypes
+from ..pe_vars import KengiEv
 
 
-class PygameKenBackend(BaseKenBackend):
-
+class PygameEvSource(DeepEvSource):
     static_mapping = {
         256: EngineEvTypes.Quit,  # pygame.QUIT is 256
         32787: EngineEvTypes.Quit,  # for pygame2.0.1+ we also have 32787 -> pygame.WINDOWCLOSE
@@ -59,9 +56,8 @@ class PygameKenBackend(BaseKenBackend):
         # TODO fix code temporaire qui est là pr améliorer (code layout) du moteur
         # injector = _hub.get_injector()
         # injector.set('pygame', _genuine_pyg)
-        dep_linking.pygame = _genuine_pyg
 
-        self._pygame_mod = _genuine_pyg  #_hub.pygame
+        self._pygame_mod = _genuine_pyg
         self.debug_mode = False
         self._ev_storage = list()
         self.pyg_jm = None  # model for joystickS
@@ -100,27 +96,23 @@ class PygameKenBackend(BaseKenBackend):
         del self._ev_storage[:]
 
         for pyev in raw_pyg_events:
+            r = None
             # for convenient gamepad support, we will
             # map pygame JOY* in a specialized way (xbox360 pad support)
             if pyev.type == cst_joyaxismotion:
                 if pyev.axis in (0, 1):
                     self.lstick_val_cache[pyev.axis] = pyev.value
-                    self._ev_storage.append(
-                        (EngineEvTypes.Stickmotion, {'side': 'left', 'pos': tuple(self.lstick_val_cache)})
-                    )
+                    r = (EngineEvTypes.Stickmotion, {'side': 'left', 'pos': tuple(self.lstick_val_cache)})
+
                 elif pyev.axis in (2, 3):
-                    self.rstick_val_cache[-2+pyev.axis] = pyev.value
-                    self._ev_storage.append(
-                        (EngineEvTypes.Stickmotion, {'side': 'right', 'pos': tuple(self.rstick_val_cache)})
-                    )
+                    self.rstick_val_cache[-2 + pyev.axis] = pyev.value
+                    r = (EngineEvTypes.Stickmotion, {'side': 'right', 'pos': tuple(self.rstick_val_cache)})
+
                 elif pyev.axis == 4:
-                    self._ev_storage.append(
-                        (EngineEvTypes.Gamepaddown, {'button': 'lTrigger', 'value': pyev.value})
-                    )
+                    r = (EngineEvTypes.Gamepaddown, {'button': 'lTrigger', 'value': pyev.value})
+
                 elif pyev.axis == 5:
-                    self._ev_storage.append(
-                        (EngineEvTypes.Gamepaddown, {'button': 'rTrigger', 'value': pyev.value})
-                    )
+                    r = (EngineEvTypes.Gamepaddown, {'button': 'rTrigger', 'value': pyev.value})
 
             elif pyev.type == cst_joyballmotion:
                 # ignore
@@ -133,44 +125,16 @@ class PygameKenBackend(BaseKenBackend):
                 if tmp[1] != 0:
                     tmp[1] *= -1
                 pyev.value = pyev.dict['value'] = tuple(tmp)
-                self._ev_storage.append((self._map_etype2kengi(pyev.type), pyev.dict))
+                r = (self._map_etype2kengi(pyev.type), pyev.dict)
 
             elif pyev.type == cst_joydown or pyev.type == cst_joyup:  # joybtdown/joybtup
                 pyev.button = self.joy_bt_map[pyev.button]  # change name of the button
                 setattr(pyev, 'value', int(pyev.type == cst_joydown))
-                self._ev_storage.append((self._map_etype2kengi(pyev.type), pyev.dict))
+                r = (self._map_etype2kengi(pyev.type), pyev.dict)
 
             else:
-                k_event = (self._map_etype2kengi(pyev.type), pyev.dict)
-                self._ev_storage.append(k_event)
+                r = (self._map_etype2kengi(pyev.type), pyev.dict)
+
+            self._ev_storage.append(KengiEv(r[0], **r[1]))
 
         return self._ev_storage
-
-
-def build_primalbackend(pbe_identifier, libbundle_ver=None):
-    """
-    :param pbe_identifier: str
-    values accepted -> to make a valid func. call you would either pass '' or 'web'
-    :param libbundle_ver: str
-    """
-    if pbe_identifier == '':  # default
-        return PygameKenBackend()
-
-    elif pbe_identifier == 'web':
-        if libbundle_ver is None:
-            if vars.weblib_sig is None or len(vars.weblib_sig)<1:
-                raise ValueError('since you use the web backend you HAVE TO specify libbundle_ver !!')
-            else:
-                adhoc_ver = vars.weblib_sig
-        else:
-            adhoc_ver = libbundle_ver
-
-        # its assumed that (injector entry 'web_pbackend')
-        # => (module==web_pbackend.py & cls==WebPbackend)
-        # for example
-        modulename = 'web_pbackend'
-        BackendAdhocClass = getattr(_hub.get_injector()[modulename], to_camelcase(modulename))
-        print('   *inside build_primalbackend*  adhoc class is ', BackendAdhocClass)
-        return BackendAdhocClass(adhoc_ver)  # web backends need to ver. info. in great details!
-    else:
-        raise ValueError(f'value "{pbe_identifier}" isnt supported, when calling (engine)build_primalbackend !')

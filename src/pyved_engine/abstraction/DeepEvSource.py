@@ -18,11 +18,10 @@ Having a formal interface is important as it enables me to "plug" into a differe
 another software environment. Components like KENGI, the KataSDK, etc. need to be
 adaptive because at the end of the day, we wish to execute games in a browser.
 """
-
 from abc import abstractmethod, ABCMeta
 
 
-class BaseKenBackend(metaclass=ABCMeta):
+class DeepEvSource(metaclass=ABCMeta):
     @abstractmethod
     def fetch_kengi_events(self):
         raise NotImplementedError
@@ -38,34 +37,3 @@ class BaseKenBackend(metaclass=ABCMeta):
     @abstractmethod
     def joystick_count(self):
         raise NotImplementedError
-
-
-class _pygameDrawIface:
-
-    @staticmethod
-    def circle(surface, color, pos, radius):
-        pass
-
-    @staticmethod
-    def rect(surface, bidule):
-        pass
-
-
-class _pygameMathIface:
-
-    def Vector2(self, **args):
-        pass
-
-
-class PygameIface:
-
-    draw = _pygameDrawIface
-    math = _pygameMathIface
-
-    KEYDOWN = -1
-    KEYUP = 2
-    K_LEFT = 3
-
-    @staticmethod
-    def Color(rgb):
-        pass

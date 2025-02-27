@@ -1,31 +1,61 @@
 """
-Pyv API := Ecs func/procedures
-  + utility func + pygame constants + the 12 func/procedures defined in the current file
+Goals of this script:
 
+- to perform a double dependency injection
+and apply it to the engine (can add stuff straight into pe_vars)
++ set screen parameters properly +bootstrap_x
+so the engine becomes actionable right away
+
+- be a gateway to the AssetsStorage part
+
+- play the role of a facade that kinda "merges":
+   Engine_constants + Engine_GameDev_api + list_of_EngineEvTypes + all_Keycodes_ever_invented
+ so the "concr_engin" folder is really a large blob we don't have to mess with anymore,
+ the facade being nicely plugged on top of it
+
+- be a gateway to the 'Hub' part of the game engine, so we encapsulate everything
+the game dev knows keywords such as "pyv.story" or "pyv.rpg" but should never be
+aware of the engine inner structure
 """
+
 import time
 from math import degrees as _degrees
 
-from pyved_engine.sublayer_implem import GameEngineSublayer  # Step 3: Inject the dependency
-from . import dep_linking, core
+from . import core
 from . import pe_vars
 from . import state_management
 from .AssetsStorage import AssetsStorage
+from .abstraction import EvSystem
+from .abstraction import GESublayer, PygameWrapper  # Step 3: Inject the dependency
 from .actors_pattern import Mediator
 from .compo import vscreen
 from .compo.vscreen import flip as _oflip
-from .foundation import events
+
+
+# insta-bind so other engine parts can rely on this
+pe_vars.ev_manager = EvSystem.EvManager.instance()
+pe_vars.engine_events = EvSystem.EngineEvTypes
+
+
+class CodesProxy:
+    def __init__(self, ref_sublayer):
+        self.sl = ref_sublayer
+
+    def __getattr__(self, item):
+        if hasattr(self.sl, item):
+            return getattr(self.sl, item)
+        print('cannot find keycode:', item)
 
 
 class EngineRouter:
-    """this is basicaly a container to expose the high-level API for the game dev,
-    it will be initialized at runtime, before loading a game cartridge so the game dev
-    hasn't to worry about that step"""
+    """this is basicaly a merged interface to expose high-level functions to the game dev,
+    it will be initialized at runtime,
+    before loading a game cartridge so the game dev hasn't to worry about that step"""
 
     # constants that help with engine initialization
     HIGH_RES_MODE, LOW_RES_MODE, RETRO_MODE = 1, 2, 3
 
-    def __init__(self, sublayer_compo: GameEngineSublayer):
+    def __init__(self, sublayer_compo: GESublayer):
         core.set_sublayer(sublayer_compo)
         core.save_engine_ref(self)
         self.low_level_service = sublayer_compo
@@ -40,6 +70,18 @@ class EngineRouter:
             'Sprite': self.low_level_service.sprite.Sprite,
             'sprite_collision': self.low_level_service.sprite.spritecollide
         }
+        self.ev_source = None
+
+    @classmethod
+    def build(cls, sublayer_cls=None):
+        """
+        Step 4: (usage) Injecting the dependency explicitly
+        """
+        if sublayer_cls is None:
+            engine_depc = PygameWrapper()
+        else:
+            engine_depc = sublayer_cls()
+        return cls(engine_depc)
 
     def preload_assets(self, metadat_dict, prefix_asset_folder=None, prefix_sound_folder=None):
         self._storage = AssetsStorage(
@@ -71,15 +113,10 @@ class EngineRouter:
             mode = self.HIGH_RES_MODE
 
         if not _engine_rdy:
-            bootstrap_e(maxfps, wcaption)
-            print('pyv.init called, but engine hasnt bootstraped yet')
-        else:
-            print('previous bootstrap_e call detected.')
+            self.ev_source = bootstrap_x(self.low_level_service, maxfps, wcaption)
 
         # back to times when we used the _hub file
         # _hub.modules_activation()  # bootstrap done so... all good to fire-up pyv modules
-        if wcaption:
-            dep_linking.pygame.display.set_caption(wcaption)
 
         if maxfps is None:  # here, we may replace the existing value of maxfps in the engine
             if pe_vars.max_fps:
@@ -91,9 +128,12 @@ class EngineRouter:
 
         pe_vars.clock = self.create_clock()
 
-        vscreen.cached_pygame_mod = dep_linking.pygame
+        # TODO find out why we used to do that?
+        # if i remove it will it break all?
+        # vscreen.cached_pygame_mod = dep_linking.pygame
+
         print('setting screen params...')
-        _screen_param(engine_mode_id, forced_size, cached_paint_ev)
+        _screen_param(self.low_level_service, engine_mode_id, forced_size, cached_paint_ev)
 
         # for retro-compat
         if multistate_info:
@@ -102,7 +142,7 @@ class EngineRouter:
             _existing_game_ctrl = state_management.StateStackCtrl()
         # the lines above have replaced class named: MyGameCtrl()
         self.ready_flag = True
-        dep_linking.pygame.mixer.init()  # we always enable sounds
+        self.low_level_service.init_sound()  # we always enable sounds
 
     def draw_circle(self, surface, color_arg, position2d, radius, width=0):
         self.low_level_service.draw_circle(surface, color_arg, position2d, radius, width)
@@ -116,39 +156,42 @@ class EngineRouter:
     def draw_polygon(self, *args, **kwargs):
         self.low_level_service.draw_polygon(*args, **kwargs)
 
+    def event_get(self):
+        return self.ev_source.fetch_kengi_events()
+
     # --- legit pyved functions
     def bootstrap_e(self):
         self.low_level_service.fire_up_backend(0)  # TODO
 
         # >>> EXPLICIT
-        # from pyved_engine.sublayer_implem import PygameWrapper
-        # from pyved_engine import dep_linking
+        # from .sublayer_implem import PygameWrapper
+        # from . import dep_linking
 
         # a line required so pyv submodules have a direct access to the sublayer, as well
-        dep_linking.pygame = self.low_level_service
+        # dep_linking.pygame = self.low_level_service
 
         # all this should be dynamically loaded?
         from .compo import gfx
         from .compo import GameTpl
         from . import custom_struct
-        from . import evsys0
+        # from . import evsys0
         from .looparts import terrain as _terrain
-        from .utils import pal
+        from . import pal
         from . import pe_vars as _vars
-        from .foundation.events import game_events_enum
+        from .abstraction.EvSystem import game_events_enum
         from . import actors_pattern
-        from .foundation import defs
+        from . import defs
         self._hub.update({
+            'states': state_management,
             'defs': defs,
             'gfx': gfx,
             'actors': actors_pattern,
             'game_events_enum': game_events_enum,
-            'EvListener': events.EvListener,
-            'Emitter': events.Emitter,
-            'EngineEvTypes': events.EngineEvTypes,
+            'EvListener': EvSystem.EvListener,
+            'Emitter': EvSystem.Emitter,
+            'EngineEvTypes': EvSystem.EngineEvTypes,
             'GameTpl': GameTpl.GameTpl,
             'struct': custom_struct,
-            'evsys0': evsys0,
             'terrain': _terrain,
             'pal': pal,
             'vars': _vars
@@ -160,13 +203,15 @@ class EngineRouter:
         print('---hub in EngineRouter ok')
 
         from .looparts import ascii as _ascii
-        from .looparts import gui as _gui
+        # from .looparts import gui as _gui
         from .looparts import story
         self._hub.update({
             'ascii': _ascii,
-            'gui': _gui,
+            #'gui': _gui,
             'story': story,
         })
+
+        self.keycodes = CodesProxy(self.low_level_service)
 
     def process_evq(self):
         pe_vars.mediator.update()
@@ -184,8 +229,7 @@ class EngineRouter:
 
     def get_mouse_coords(self):
         # pygm = _kengi_inj['pygame']
-        pygm = dep_linking.pygame
-        mpos = pygm.mouse.get_pos()
+        mpos = self.low_level_service.mouse.get_pos()
         # return _kengi_inj['vscreen'].proj_to_vscreen(mpos)
         return vscreen.proj_to_vscreen(mpos)
 
@@ -195,10 +239,10 @@ class EngineRouter:
         return pe_vars.screen
 
     def create_clock(self):
-        return dep_linking.pygame.time.Clock()
+        return self.low_level_service.new_clock_obj()
 
     def get_ev_manager(self):
-        return events.EvManager.instance()
+        return EvSystem.EvManager.instance()
 
     def flip(self):
         _oflip()
@@ -215,7 +259,7 @@ class EngineRouter:
         self.low_level_service.quit()
 
     def surface_create(self, size):
-        return dep_linking.pygame.Surface(size)
+        return self.low_level_service.new_surface_obj(size)
 
     def surface_rotate(self, img, angle):
         return dep_linking.pygame.transform.rotate(img, _degrees(-1 * angle))
@@ -263,7 +307,7 @@ _scr_init_flag = False
 
 
 # --- rest of functions ---
-def bootstrap_e(maxfps=None, wcaption=None, print_ver_info=True):
+def bootstrap_x(lower_level_svc, maxfps=None, wcaption=None, print_ver_info=True):
     global _engine_rdy
     pe_vars.mediator = Mediator()
 
@@ -278,23 +322,31 @@ def bootstrap_e(maxfps=None, wcaption=None, print_ver_info=True):
     if print_ver_info:
         print(f'Booting up pyved-engine {v}...')
 
-    from .foundation.pbackends import build_primalbackend
+    # here,
+    #  we do heavy lifting to bind the pygame event source with the high-level event manager
 
-    # SIDE-EFFECT: Building the backend also sets kengi_inj.pygame !
-    _pyv_backend = build_primalbackend(pe_vars.backend_name)
-    # if you dont call this line below, the modern event system wont work (program hanging)
-    events.EvManager.instance().a_event_source = _pyv_backend
+    from . import abstraction
 
-    dep_linking.pygame.init()
+    # (SIDE-EFFECT: Building the backend also sets kengi_inj.pygame )
+
+    _pyv_backend = abstraction.build_primalbackend(pe_vars.backend_name)
+
+    # CAREFUL: if you dont call the line below,
+    # the high level event system wont work (program hanging)
+    EvSystem.EvManager.instance().a_event_source = _pyv_backend
+
+    lower_level_svc.init()
     if wcaption:
-        dep_linking.pygame.display.set_caption(wcaption)
+        lower_level_svc.set_caption(wcaption)
     _engine_rdy = True
+
+    return _pyv_backend  # returns a engine-compatible event source
 
 
 # -------------------------------
 #  private functions
 # ------------------------------
-def _screen_param(gfx_mode_code, screen_dim, cached_paintev) -> None:
+def _screen_param(lower_level_svc, gfx_mode_code, screen_dim, cached_paintev) -> None:
     """
     :param gfx_mode_code: either 0 for custom scr_size, or any value in [1, 3] for std scr_size with upscaling
     :param screen_dim: can be None or a pair of integers
@@ -330,18 +382,18 @@ def _screen_param(gfx_mode_code, screen_dim, cached_paintev) -> None:
     # ---------------------------------
     if not _scr_init_flag:
         if vscreen.stored_upscaling is not None:
-            pygame_surf_dessin = dep_linking.pygame.Surface(taille_surf_dessin)
+            pygame_surf_dessin = lower_level_svc.new_surface_obj(taille_surf_dessin)
             vscreen.set_virtual_screen(pygame_surf_dessin)
             vscreen.set_upscaling(adhoc_upscaling)
             if gfx_mode_code:
-                pgscreen = dep_linking.pygame.display.set_mode(pe_vars.disp_size)
+                pgscreen = lower_level_svc.set_mode(pe_vars.disp_size)
             else:
-                pgscreen = dep_linking.pygame.display.set_mode(taille_surf_dessin)
+                pgscreen = lower_level_svc.set_mode(taille_surf_dessin)
             vscreen.set_realpygame_screen(pgscreen)
 
         else:  # stored_upscaling wasnt relevant so far =>we usin webctx
             _active_state = True
-            pygame_surf_dessin = dep_linking.pygame.display.set_mode(taille_surf_dessin)
+            pygame_surf_dessin = lower_level_svc.set_mode(taille_surf_dessin)
             vscreen.set_virtual_screen(pygame_surf_dessin)
             # this line is useful for enabling mouse_pos computations even in webCtx
             vscreen.stored_upscaling = float(adhoc_upscaling)
@@ -355,6 +407,7 @@ def _screen_param(gfx_mode_code, screen_dim, cached_paintev) -> None:
 
 _existing_game_ctrl = None
 
+
 def close_game():
     pe_vars.gameover = False
     dep_linking.pygame.mixer.quit()
@@ -364,9 +417,6 @@ def close_game():
     pe_vars.csvdata.clear()
     pe_vars.sounds.clear()
     pe_vars.spritesheets.clear()
-
-
-
 
 
 def curr_state() -> int:

@@ -1,9 +1,9 @@
 import re
 import time
+from collections import deque
 
-from .._classes import CircularBuffer
-from ..foundation.defs import EngineEvTypes, KengiEv, PseudoEnum
-from ..foundation.defs import to_camelcase, to_snakecase, Singleton
+from ..pe_vars import EngineEvTypes, KengiEv, PseudoEnum
+from ..pe_vars import to_camelcase, to_snakecase, Singleton
 
 
 _FIRST_LISTENER_ID = 72931
@@ -11,6 +11,50 @@ _FIRST_LISTENER_ID = 72931
 
 def game_events_enum(x_iterable):
     return PseudoEnum(x_iterable, 1 + EngineEvTypes.first + EngineEvTypes.size)
+
+
+class CircularBuffer:
+
+    def __init__(self, gmax_len=128):
+        """
+        Initialize the CircularBuffer with a gmax_len if given. Default size is 128
+        """
+        self.deque_obj = deque(maxlen=gmax_len)
+
+    def __str__(self):
+        """Return a formatted string representation of this CircularBuffer."""
+        items = ['{!r}'.format(item) for item in self.deque_obj]
+        return '[' + ', '.join(items) + ']'
+
+    def get_size(self):
+        return len(self.deque_obj)
+
+    def is_empty(self):
+        """Return True if the head of the CircularBuffer is equal to the tail,
+        otherwise return False"""
+        return len(self.deque_obj) == 0
+
+    def is_full(self):
+        """Return True if the tail of the CircularBuffer is one before the head,
+        otherwise return False"""
+        return len(self.deque_obj) == self.deque_obj.maxlen
+
+    def enqueue(self, item):
+        """Insert an item at the back of the CircularBuffer
+        Runtime: O(1) Space: O(1)"""
+        self.deque_obj.append(item)
+
+    def dequeue(self):
+        """Return the item at the front of the Circular Buffer and remove it
+        Runtime: O(1) Space: O(1)"""
+        return self.deque_obj.popleft()
+
+    def front(self):
+        """Return the item at the front of the CircularBuffer
+        Runtime: O(1) Space: O(1)"""
+        if len(self.deque_obj):
+            return self.deque_obj[len(self.deque_obj) - 1]
+        raise IndexError('circular buffer is currently empty!')
 
 
 @Singleton
@@ -64,10 +108,13 @@ class EvManager:
             del self._intervalsdef[etype]
 
     def update(self):
-        # optional block:
-        # in some cases this is equivalent to a <pass> instruction
+        # optional:
+        # in some cases THE BLOCK BELOW is equivalent to a <pass> instruction
         if self.a_event_source is not None:
-            self._cbuffer.deque_obj.extend(self.a_event_source.fetch_kengi_events())
+            tmp = self.a_event_source.fetch_kengi_events()  # pygame events were converted to instances of KengiEv
+            for ke in tmp:
+                self._cbuffer.deque_obj.append((ke.type, ke.fields))
+        # -----------------
 
         # if some interval timed-events have been defined, inject whats needed to _cbuffer
         for ety, delay in self._intervalsdef.items():
@@ -83,6 +130,7 @@ class EvManager:
         kappa = len(self._cbuffer.deque_obj)
         while kappa > 0:
             etype, d = self._cbuffer.dequeue()
+
             kappa -= 1
             if etype not in self._etype_to_listenerli:
                 continue

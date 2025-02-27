@@ -1,4 +1,3 @@
-from ..foundation import defs
 from .. import pe_vars as engine_vars
 from .. import core
 
@@ -38,7 +37,7 @@ def flip():
         if 1 == stored_upscaling:
             realscreen.blit(engine_vars.screen, (0, 0))
         else:
-            sl.transform.scale(engine_vars.screen, defs.STD_SCR_SIZE, realscreen)
+            sl.transform.scale(engine_vars.screen, engine_vars.STD_SCR_SIZE, realscreen)
     sl.display.update()
 
 

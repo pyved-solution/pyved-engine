@@ -1,9 +1,8 @@
 import time
 from abc import ABCMeta, abstractmethod
 
-from .. import evsys0
-from ..foundation.events import EvManager, EngineEvTypes
 from .. import pe_vars as engine_vars
+from ..abstraction.EvSystem import EvManager, EngineEvTypes
 
 
 class GameTpl(metaclass=ABCMeta):
@@ -16,7 +15,6 @@ class GameTpl(metaclass=ABCMeta):
     SAFETY_LOCK = False  # can be set to True from outside, if you don't want a game to call .loop()
 
     def __init__(self, engine_inst):
-        self.gameover = False
         self.nxt_game = 'niobepolis'
         self._manager = None
         self.engine = engine_inst
@@ -58,10 +56,7 @@ class GameTpl(metaclass=ABCMeta):
             self.engine.declare_game_states(gs_enum, mapping, self)
 
     def update(self, infot):
-        pk = evsys0.pressed_keys()
-        if pk[evsys0.K_ESCAPE]:
-            self.gameover = True
-            return 2, self.nxt_game
+        pk = self.engine.get_pressed()
         self._manager.post(EngineEvTypes.Update, curr_t=infot)
         self._manager.post(EngineEvTypes.Paint, screen=engine_vars.screen)
         self._manager.update()
@@ -76,13 +71,14 @@ class GameTpl(metaclass=ABCMeta):
         if one wants to test a program without using the Kata VM
         :return:
         """
+        print('dans loop')
         # lock mechanism, for extra safety so we never call .loop() in the web ctx
         if self.SAFETY_LOCK:
             raise ValueError(self.ERR_LOCK_MSG)
 
         # use enter, update, exit to handle the global "run game logic"
         self.enter()
-        while not self.gameover:
+        while not engine_vars.gameover:
             infot = time.time()
             self.update(infot)
         self.exit()

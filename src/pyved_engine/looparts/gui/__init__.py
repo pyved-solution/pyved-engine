@@ -1,8 +1,8 @@
 """
 sub-module dedicated to GUI management/creation. This belongs to the 'Kengi' engine
 """
-from .Button import Button
-from .Button2 import Button2
+# from .Button import Button
+# from .Button2 import Button2
 from .DispCenteredPopup import DispCenteredPopup
 from .Label import Label
 from .TextBlock import TextBlock
@@ -12,10 +12,10 @@ from .WidgetContainer import WidgetContainer
 from .base import ANCHOR_CENTER, ANCHOR_RIGHT, ANCHOR_LEFT  # bring codes here
 from .base import AugmentedSprite
 from .text import ImgBasedFont
-from ... import dep_linking
+# from ... import dep_linking
 
-
-pygame = dep_linking.pygame
+# TODO fix so we dont use the pygame but rather the EngineRouter/hub
+# pygame = dep_linking.pygame
 
 
 class Etiquette:

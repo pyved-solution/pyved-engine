@@ -2,7 +2,7 @@
 """
 import base64
 import gzip
-import importlib.util
+# import importlib.util
 import xml.etree.ElementTree as etree
 import zlib
 from pathlib import Path
