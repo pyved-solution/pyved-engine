@@ -1,5 +1,5 @@
 """
-more or less everything in this module is now deprecated,
+many things in this module are now deprecated,
  as of time of writing (2025)
 
 we used to have:

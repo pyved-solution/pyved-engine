@@ -1,4 +1,4 @@
-from .GESublayer import GESublayer
+from ..ifaces.GESublayer import GESublayer
 
 
 # Step 2: Implement the interface in a concrete class

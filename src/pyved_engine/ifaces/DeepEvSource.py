@@ -1,12 +1,11 @@
 """
 Licensed code LGPL 3
-(c) 2018-2024, to the Kata.Games company
+the KataGames.io company (c) 2021-2025
 
-TL;DR - Pyved is not using 100% of pygame functions.
-So how much of pygame do we use?
+TL;DR - Pyved isnt using 100% of pygame functions. So... How much of pygame do we use?
 
-More precisely: this file is here so I can:
-(A) specify (for this I propose an informal interface) a SUBSET of pygame
+Thanks to the current file, I can:
+(A) specify a SUBSET of pygame
 
 (B) offer a formal interface for the so-called "PRIMAL backend". Such a backend can
 be implemented in various ways. Interestingly, one possible way is to use a SUBSET of pygame.
@@ -18,22 +17,22 @@ Having a formal interface is important as it enables me to "plug" into a differe
 another software environment. Components like KENGI, the KataSDK, etc. need to be
 adaptive because at the end of the day, we wish to execute games in a browser.
 """
-from abc import abstractmethod, ABCMeta
+from abc import ABC, abstractmethod
 
 
-class DeepEvSource(metaclass=ABCMeta):
+class DeepEvSource(ABC):
     @abstractmethod
     def fetch_kengi_events(self):
-        raise NotImplementedError
+        pass
 
     @abstractmethod
     def joystick_init(self, idj):
-        raise NotImplementedError
+        pass
 
     @abstractmethod
     def joystick_info(self, idj):
-        raise NotImplementedError
+        pass
 
     @abstractmethod
     def joystick_count(self):
-        raise NotImplementedError
+        pass

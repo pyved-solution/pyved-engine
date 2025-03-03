@@ -1,5 +1,21 @@
+"""
+in this module we should ALSO define standard transport layers for events that are "cross-events":
+ - network layer based on sockets
+ - network layer based on websockets
+"""
 from .PygameEvSource import PygameEvSource
 from .PygameWrapper import PygameWrapper
+
+# TODO
+# deep_ev_source_cls = 'PygameEvSource'
+# ws_transport_cls = 'WsTransportLocalCtx'
+
+# then use importlib to load stuff.
+# in that way, we'll be able to reconfigure at runtime!
+# For example:
+
+# deep_ev_source_cls = 'CanvasBasedEvSource'
+# ws_transport_cls = 'WsTransportWebCtx'
 
 
 def build_primalbackend(pbe_identifier, libbundle_ver=None):

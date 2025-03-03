@@ -21,15 +21,15 @@ aware of the engine inner structure
 import time
 from math import degrees as _degrees
 
-from . import core
-from . import pe_vars
-from . import state_management
+from .barebone import core
+from .concr_engin import pe_vars
+from .m_essentials import states as state_management
 from .AssetsStorage import AssetsStorage
 from .abstraction import EvSystem
-from .abstraction import GESublayer, PygameWrapper  # Step 3: Inject the dependency
-from .actors_pattern import Mediator
-from .compo import vscreen
-from .compo.vscreen import flip as _oflip
+from .abstraction import PygameWrapper  # Step 3: Inject the dependency
+# from .actors_pattern import Mediator
+from .concr_engin.vscreen import flip as _oflip
+from .concr_engin import vscreen
 
 
 # insta-bind so other engine parts can rely on this
@@ -55,7 +55,9 @@ class EngineRouter:
     # constants that help with engine initialization
     HIGH_RES_MODE, LOW_RES_MODE, RETRO_MODE = 1, 2, 3
 
-    def __init__(self, sublayer_compo: GESublayer):
+    def __init__(self, sublayer_compo):  # TODO injection should be done elsewhere
+        # sublayer_compo: GESublayer (type)
+
         core.set_sublayer(sublayer_compo)
         core.save_engine_ref(self)
         self.low_level_service = sublayer_compo
@@ -71,17 +73,6 @@ class EngineRouter:
             'sprite_collision': self.low_level_service.sprite.spritecollide
         }
         self.ev_source = None
-
-    @classmethod
-    def build(cls, sublayer_cls=None):
-        """
-        Step 4: (usage) Injecting the dependency explicitly
-        """
-        if sublayer_cls is None:
-            engine_depc = PygameWrapper()
-        else:
-            engine_depc = sublayer_cls()
-        return cls(engine_depc)
 
     def preload_assets(self, metadat_dict, prefix_asset_folder=None, prefix_sound_folder=None):
         self._storage = AssetsStorage(
@@ -106,7 +97,8 @@ class EngineRouter:
 
     def init(self, engine_mode_id: int, maxfps=None, wcaption=None, forced_size=None, cached_paint_ev=None, multistate_info=None) -> None:
         rez = self.low_level_service.fire_up_backend(engine_mode_id)
-        self.mediator = Mediator()
+        # TODO use mediator everythime ? instead of EvManager
+        self.mediator = None  # Mediator()
 
         global _engine_rdy, _upscaling_var, _existing_game_ctrl
         if engine_mode_id is None:
@@ -171,15 +163,15 @@ class EngineRouter:
         # dep_linking.pygame = self.low_level_service
 
         # all this should be dynamically loaded?
-        from .compo import gfx
-        from .compo import GameTpl
-        from . import custom_struct
+        from .m_essentials import gfx
+        from .m_essentials import GameTpl
+        from .barebone import custom_struct
         # from . import evsys0
-        from .looparts import terrain as _terrain
-        from . import pal
-        from . import pe_vars as _vars
+        from .m_ext import terrain as _terrain
+        from .m_essentials import pal
+        from .concr_engin import pe_vars as _vars
         from .abstraction.EvSystem import game_events_enum
-        from . import actors_pattern
+        from .creep import actors_pattern
         from . import defs
         self._hub.update({
             'states': state_management,
@@ -196,19 +188,19 @@ class EngineRouter:
             'pal': pal,
             'vars': _vars
         })
-        from .looparts import polarbear
+        from .m_ext import polarbear
         self._hub.update({
             'polarbear': polarbear
         })
         print('---hub in EngineRouter ok')
 
-        from .looparts import ascii as _ascii
+        from .m_ext import ascii as _ascii
         # from .looparts import gui as _gui
-        from .looparts import story
+        # from .m_ext import story
         self._hub.update({
             'ascii': _ascii,
-            #'gui': _gui,
-            'story': story,
+            # 'gui': _gui,
+            # 'story': story,
         })
 
         self.keycodes = CodesProxy(self.low_level_service)
@@ -309,7 +301,8 @@ _scr_init_flag = False
 # --- rest of functions ---
 def bootstrap_x(lower_level_svc, maxfps=None, wcaption=None, print_ver_info=True):
     global _engine_rdy
-    pe_vars.mediator = Mediator()
+    # TODO check when to use mediator
+    pe_vars.mediator = None  # Mediator()
 
     if maxfps is None:
         y = 60

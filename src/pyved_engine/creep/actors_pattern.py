@@ -2,8 +2,8 @@ import re
 import uuid
 from enum import Enum
 
-from . import pe_vars
-from .custom_struct import Objectifier
+from ..barebone import Objectifier
+from ..concr_engin import pe_vars
 
 
 # -------------- actor-based gamedev API (experimental) -------------------------

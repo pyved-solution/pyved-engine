@@ -1,6 +1,6 @@
-from .DeepEvSource import DeepEvSource
-from ..pe_vars import EngineEvTypes
-from ..pe_vars import KengiEv
+from ..ifaces.DeepEvSource import DeepEvSource
+from ..concr_engin.pe_vars import EngineEvTypes
+from ..concr_engin.pe_vars import KengiEv
 
 
 class PygameEvSource(DeepEvSource):
