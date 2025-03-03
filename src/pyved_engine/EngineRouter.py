@@ -27,7 +27,8 @@ from .AssetsStorage import AssetsStorage
 from .abstraction import EvSystem
 from .abstraction import PygameWrapper  # Step 3: Inject the dependency
 # from .actors_pattern import Mediator
-from .concr_engin.vscreen import flip as _oflip
+from .concr_engin.pe_vars import screen
+from .concr_engin import vscreen as screen_mo
 from .concr_engin import vscreen
 
 
@@ -135,8 +136,12 @@ class EngineRouter:
         # if i remove it will it break all?
         # vscreen.cached_pygame_mod = dep_linking.pygame
 
+        self.low_level_service.set_mode()  # pygame display gets activated
         print('setting screen params...')
-        _screen_param(self.low_level_service, engine_mode_id, forced_size, cached_paint_ev)
+
+        screen_mo.do_screen_param(
+            self.low_level_service, engine_mode_id, self.low_level_service.get_window_size(), cached_paint_ev
+        )
 
         # for retro-compat
         if multistate_info:
@@ -257,7 +262,7 @@ class EngineRouter:
         return EvSystem.EvManager.instance()
 
     def flip(self):
-        _oflip()
+        screen_mo.flip()
         if pe_vars.max_fps:
             pe_vars.clock.tick(pe_vars.max_fps)
 
@@ -353,68 +358,6 @@ def snd_part_init(lower_level_svc, maxfps=None, wcaption=None, print_ver_info=Tr
     _engine_rdy = True
 
     return _pyv_backend  # returns a engine-compatible event source
-
-
-# -------------------------------
-#  private functions
-# ------------------------------
-def _screen_param(lower_level_svc, gfx_mode_code, screen_dim, cached_paintev) -> None:
-    """
-    :param gfx_mode_code: either 0 for custom scr_size, or any value in [1, 3] for std scr_size with upscaling
-    :param screen_dim: can be None or a pair of integers
-    :param cached_paintev: can be None or a pyved event that needs to have its .screen attribute set
-    """
-    print('---dans screen_params -->')
-    print('args:', gfx_mode_code, screen_dim, cached_paintev)
-    global _scr_init_flag
-
-    # all the error management tied to the "gfx_mode_code" argument has to be done now
-    is_valid_gfx_mode = isinstance(gfx_mode_code, int) and 0 <= gfx_mode_code <= 3
-    if not is_valid_gfx_mode:
-        info_t = type(gfx_mode_code)
-        err_msg = f'graphic mode-> {gfx_mode_code}: {info_t}, isnt valid one! Expected type: int'
-        raise ValueError(err_msg)
-    if gfx_mode_code == 0 and screen_dim is None:
-        ValueError(f'Error! Graphic mode 0 implies that a valid "screen_dim" argument is provided by the user!')
-
-    # from here and below,
-    # we know the gfx_mode_code is valid 100%
-    conventionw, conventionh = pe_vars.disp_size
-    if gfx_mode_code != 0:
-        adhoc_upscaling = gfx_mode_code
-        taille_surf_dessin = int(conventionw / gfx_mode_code), int(conventionh / gfx_mode_code)
-    else:
-        adhoc_upscaling = 1
-        taille_surf_dessin = screen_dim
-        print(adhoc_upscaling, taille_surf_dessin)
-
-    # ---------------------------------
-    #  legacy code, not modified in july22. It's complex but
-    # it works so dont modify unless you really know what you're doing ;)
-    # ---------------------------------
-    if not _scr_init_flag:
-        if vscreen.stored_upscaling is not None:
-            pygame_surf_dessin = lower_level_svc.new_surface_obj(taille_surf_dessin)
-            vscreen.set_virtual_screen(pygame_surf_dessin)
-            vscreen.set_upscaling(adhoc_upscaling)
-            if gfx_mode_code:
-                pgscreen = lower_level_svc.set_mode(pe_vars.disp_size)
-            else:
-                pgscreen = lower_level_svc.set_mode(taille_surf_dessin)
-            vscreen.set_realpygame_screen(pgscreen)
-
-        else:  # stored_upscaling wasnt relevant so far =>we usin webctx
-            _active_state = True
-            pygame_surf_dessin = lower_level_svc.set_mode(taille_surf_dessin)
-            vscreen.set_virtual_screen(pygame_surf_dessin)
-            # this line is useful for enabling mouse_pos computations even in webCtx
-            vscreen.stored_upscaling = float(adhoc_upscaling)
-
-        y = pygame_surf_dessin
-        pe_vars.screen = y
-        if cached_paintev:
-            cached_paintev.screen = y
-        _scr_init_flag = True
 
 
 _existing_game_ctrl = None

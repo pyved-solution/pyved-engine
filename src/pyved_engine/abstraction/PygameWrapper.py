@@ -53,7 +53,13 @@ class PygameWrapper(GESublayer):
         return self._pygame.key.get_pressed()
 
     def set_mode(self, *args, **kwargs):
-        self._pygame.display.set_mode(args[0])  # pass size only
+        print('allumage --Pygame--')
+        self._pygame.display.set_mode(
+            # args[0]  # deprecated: back when the user was able to select scr size...
+            # (1200, 675),
+            (0, 0),
+            flags=self._pygame.FULLSCREEN  #self._pygame.RESIZABLE
+        )
 
     def new_surface_obj(self, size):
         return self._pygame.surface.Surface(size)
@@ -64,6 +70,9 @@ class PygameWrapper(GESublayer):
         else:
             r = self._pygame.transform.scale(s1, new_size)
         return r
+
+    def get_window_size(self):
+        return self._pygame.display.get_surface().get_size()
 
     def new_clock_obj(self, *args, **kwargs):
         return self._pygame.time.Clock()

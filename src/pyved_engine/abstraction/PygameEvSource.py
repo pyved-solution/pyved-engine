@@ -1,3 +1,4 @@
+from ..concr_engin import vscreen
 from ..ifaces.DeepEvSource import DeepEvSource
 from ..concr_engin.pe_vars import EngineEvTypes
 from ..concr_engin.pe_vars import KengiEv
@@ -135,6 +136,9 @@ class PygameEvSource(DeepEvSource):
             else:
                 r = (self._map_etype2kengi(pyev.type), pyev.dict)
 
+            if r[0] in (EngineEvTypes.Mousedown, EngineEvTypes.Mouseup, EngineEvTypes.Mousemotion):
+                r[1]['pos'] = vscreen.proj_to_vscreen(r[1]['pos'])
+                # TODO what about rel??
             self._ev_storage.append(KengiEv(r[0], **r[1]))
 
         return self._ev_storage
