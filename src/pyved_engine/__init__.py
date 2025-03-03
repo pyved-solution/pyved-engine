@@ -19,7 +19,7 @@ from .EngineRouter import EngineRouter
 from .compo.GameTpl import GameTpl  # legacy cls
 # from .foundation import legacy_evs  # we just copy the event system of pygame
 from .abstraction.EvSystem import Emitter, EvListener, EngineEvTypes
-from . import pe_vars as defs
+from .concr_engin import pe_vars as defs
 
 
 # TODO remove this when we can

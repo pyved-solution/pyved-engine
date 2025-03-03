@@ -20,10 +20,9 @@ aware of the engine inner structure
 
 import time
 from math import degrees as _degrees
-
-from .barebone import core
+from .concr_engin import core
 from .concr_engin import pe_vars
-from .m_essentials import states as state_management
+from . import state_management
 from .AssetsStorage import AssetsStorage
 from .abstraction import EvSystem
 from .abstraction import PygameWrapper  # Step 3: Inject the dependency
@@ -163,12 +162,12 @@ class EngineRouter:
         # dep_linking.pygame = self.low_level_service
 
         # all this should be dynamically loaded?
-        from .m_essentials import gfx
-        from .m_essentials import GameTpl
-        from .barebone import custom_struct
+        from .compo import gfx
+        from .compo import GameTpl
+        from . import custom_struct
         # from . import evsys0
-        from .m_ext import terrain as _terrain
-        from .m_essentials import pal
+        from .looparts import terrain as _terrain
+        from . import pal
         from .concr_engin import pe_vars as _vars
         from .abstraction.EvSystem import game_events_enum
         from .creep import actors_pattern
@@ -188,13 +187,13 @@ class EngineRouter:
             'pal': pal,
             'vars': _vars
         })
-        from .m_ext import polarbear
+        from .looparts import polarbear
         self._hub.update({
             'polarbear': polarbear
         })
         print('---hub in EngineRouter ok')
 
-        from .m_ext import ascii as _ascii
+        from .looparts import ascii as _ascii
         # from .looparts import gui as _gui
         # from .m_ext import story
         self._hub.update({

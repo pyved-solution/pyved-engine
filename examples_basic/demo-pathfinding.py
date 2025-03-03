@@ -1,4 +1,4 @@
-from pyved_engine.sublayer_implem import PygameWrapper
+from pyved_engine.abstraction import PygameWrapper
 import pyved_engine
 # Step 4: (usage) Injecting the dependency explicitly:
 engine_depc = PygameWrapper()

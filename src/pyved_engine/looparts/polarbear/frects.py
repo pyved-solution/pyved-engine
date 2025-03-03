@@ -1,4 +1,4 @@
-from ... import core
+from ...concr_engin import core
 
 
 pyv = core.ref_engine()

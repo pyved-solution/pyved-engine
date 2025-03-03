@@ -1,6 +1,6 @@
 import json
 from typing import List, Dict
-from .. import core
+from ..concr_engin import core
 
 """
 warning:

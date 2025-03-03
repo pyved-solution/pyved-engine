@@ -7,7 +7,7 @@ Using c=pyv.get_game_ctrl() then c.loop()
 is very handy but it becomes tricky when sharing games online
 """
 import math
-from pyved_engine.sublayer_implem import PygameWrapper
+from pyved_engine.abstraction.PygameWrapper import PygameWrapper
 import pyved_engine
 # Step 4: (usage) Injecting the dependency explicitly:
 engine_depc = PygameWrapper()
@@ -232,8 +232,8 @@ def update(time_info=None):
 
     # Main program loop
     # Process the events in the game
-    for event in pyv.evsys0.get():
-        if event.type == pyv.evsys0.QUIT:
+    for event in pyv.event_get():
+        if event.type == pyv.EngineEvTypes.Quit:
             pyv.vars.gameover = True
 
     # Update the ball and player position as long

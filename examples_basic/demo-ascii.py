@@ -1,13 +1,8 @@
 """
 testing the .ascii pyv submodule
 """
-from pyved_engine.sublayer_implem import PygameWrapper
-import pyved_engine
-# Step 4: (usage) Injecting the dependency explicitly:
-engine_depc = PygameWrapper()
-pyv = pyved_engine.EngineRouter(
-    engine_depc
-)
+from pyved_engine import EngineRouter
+pyv = EngineRouter.build()
 pyv.bootstrap_e()
 
 
@@ -44,18 +39,19 @@ def game_loop():
     global asc_canvas, text_pos
 
     while not pyv.vars.gameover:
-        for ev in pyv.evsys0.get():
-            if ev.type == pyv.evsys0.QUIT or (ev.type == pyv.evsys0.KEYDOWN and ev.key == pyv.evsys0.K_ESCAPE):
+        for ev in pyv.event_get():
+            print(ev)
+            if ev.type == pyv.EngineEvTypes.Quit or (ev.type == pyv.KEYDOWN and ev.key == pyv.keycodes.K_ESCAPE):
                 pyv.vars.gameover = True
-            elif ev.type == pyv.evsys0.MOUSEBUTTONDOWN:
+            elif ev.type == pyv.EngineEvTypes.Mousedown:
                 text_pos = list(pyv.ascii.screen_to_cpos(ev.pos))
-            elif ev.type == pyv.evsys0.KEYDOWN:
+            elif ev.type == pyv.EngineEvTypes.Keydown:
 
-                if ev.key == pyv.evsys0.K_BACKSPACE:
+                if ev.key == pyv.keycodes.K_BACKSPACE:
                     pyv.ascii.increm_char_size()
                     text_pos = None
 
-                elif text_pos is not None and ev.key != pyv.evsys0.K_RETURN:
+                elif text_pos is not None and ev.key != pyv.keycodes.K_RETURN:
                     cle = tuple(text_pos)
                     if cle not in ajouts:
                         ajouts[cle] = list()

@@ -3,8 +3,8 @@ all shards/looparts elements start the same way
 """
 
 # engine_link = pe_vars = None
-from .. import pe_vars
-from .. import core
+from ..concr_engin import pe_vars
+from ..concr_engin import core
 
 
 engine_link = core.ref_engine()

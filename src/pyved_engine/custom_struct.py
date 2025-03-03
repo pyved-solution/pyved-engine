@@ -1,6 +1,5 @@
 import abc
-
-from .core import underscore_format
+from .concr_engin.core import underscore_format
 
 
 class Objectifier:

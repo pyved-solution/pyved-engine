@@ -3,7 +3,7 @@ import weakref
 from . import frects
 from . import image
 from .image import TEXT_COLOR, truncline, render_text
-from ... import core
+from ...concr_engin import core
 
 
 pyv = core.ref_engine()

@@ -1,6 +1,6 @@
 from . import frects
 from . import image
-from ... import core
+from ...concr_engin import core
 
 from .general import my_state, TEXT_COLOR, Border, default_border, wrap_with_records
 from .image import wrap_multi_line, draw_text

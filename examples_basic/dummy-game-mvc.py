@@ -3,13 +3,10 @@ showcasing the "dummy game" but we make use of the MVC pattern here.
 This file will help you in understanding how the pattern should be applied to
 your particular game idea
 """
-from pyved_engine.sublayer_implem import PygameWrapper
-import pyved_engine
-# Step 4: (usage) Injecting the dependency explicitly:
-engine_depc = PygameWrapper()
-pyv = pyved_engine.EngineRouter(
-    engine_depc
-)
+from pyved_engine import EngineRouter
+from pyved_engine.abstraction.PygameWrapper import PygameWrapper
+pyv = EngineRouter(PygameWrapper())
+
 pyv.bootstrap_e()
 
 
@@ -95,19 +92,19 @@ class DemoCtrl(pyv.EvListener):
         pyv.vars.gameover = True
 
     def on_keyup(self, ev):
-        prkeys = pyv.evsys0.pressed_keys()
-        if (not prkeys[pyv.evsys0.K_UP]) and (not prkeys[pyv.evsys0.K_DOWN]):
+        prkeys = pyv.get_pressed()
+        if (not prkeys[pyv.keycodes.K_UP]) and (not prkeys[pyv.keycodes.K_DOWN]):
             self.state.av_y_speed = 0
 
     def on_keydown(self, ev):
-        if ev.key == pyv.evsys0.K_ESCAPE:
+        if ev.key == pyv.keycodes.K_ESCAPE:
             pyv.vars.gameover = True
             print('dummy good bye')
-        elif ev.key == pyv.evsys0.K_SPACE:
+        elif ev.key == pyv.keycodes.K_SPACE:
             self.state.switch_avatar_color()
-        elif ev.key == pyv.evsys0.K_UP:
+        elif ev.key == pyv.keycodes.K_UP:
             self.state.av_y_speed = -1
-        elif ev.key == pyv.evsys0.K_DOWN:
+        elif ev.key == pyv.keycodes.K_DOWN:
             self.state.av_y_speed = 1
 
 

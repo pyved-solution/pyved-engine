@@ -1,11 +1,10 @@
 import time
 
-from . import pe_vars
 from ._classes import BaseGameState
-from .compo import vscreen
-from .custom_struct import Stack, StContainer, enum
 from .abstraction import EvSystem
-
+from .concr_engin import pe_vars
+from .concr_engin import vscreen
+from .custom_struct import Stack, StContainer, enum
 
 multistite_flag = False
 stack_based_ctrl = None

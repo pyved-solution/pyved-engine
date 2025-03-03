@@ -2,7 +2,7 @@ import re
 import uuid
 from enum import Enum
 
-from ..barebone import Objectifier
+from ..custom_struct import Objectifier
 from ..concr_engin import pe_vars
 
 

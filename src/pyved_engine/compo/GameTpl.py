@@ -1,8 +1,8 @@
 import time
 from abc import ABCMeta, abstractmethod
 
-from .. import pe_vars as engine_vars
 from ..abstraction.EvSystem import EvManager, EngineEvTypes
+from ..concr_engin import pe_vars as engine_vars
 
 
 class GameTpl(metaclass=ABCMeta):

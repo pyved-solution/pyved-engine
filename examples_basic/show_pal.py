@@ -1,6 +1,6 @@
 
 import math
-from pyved_engine.sublayer_implem import PygameWrapper
+from pyved_engine.abstraction.PygameWrapper import PygameWrapper
 import pyved_engine
 # Step 4: (usage) Injecting the dependency explicitly:
 engine_depc = PygameWrapper()
@@ -78,11 +78,11 @@ def run_game():
     scr = pyv.get_surface()
 
     while not gameover:
-        for ev in pyv.evsys0.event.get():
-            if ev.type == pyv.evsys0.QUIT:
+        for ev in pyv.event_get():
+            if ev.type == pyv.EngineEvTypes.Quit:
                 gameover = True
-            elif ev.type == pyv.evsys0.KEYDOWN:
-                if ev.key == pyv.evsys0.K_ESCAPE:
+            elif ev.type == pyv.EngineEvTypes.Keydown:
+                if ev.key == pyv.keycodes.K_ESCAPE:
                     gameover = True
         # display
         scr.fill((0, 0, 255))
@@ -96,7 +96,7 @@ def run_game():
 
         pyv.flip()
         cl.tick(60)
-
+    print('clooosii')
     pyv.close_game()
     print('bye')
 

@@ -3,7 +3,7 @@ import json
 import os
 from io import StringIO
 
-from . import pe_vars
+from .concr_engin import pe_vars
 
 
 class AssetsStorage:
