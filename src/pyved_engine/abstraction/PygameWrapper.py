@@ -35,6 +35,7 @@ class PygameWrapper(GESublayer):
         self.KEYUP = self._pygame.KEYUP
         self.MOUSEBUTTONDOWN = self._pygame.MOUSEBUTTONDOWN
         self.MOUSEBUTTONUP = self._pygame.MOUSEBUTTONUP
+        self.MOUSEMOTION = self._pygame.MOUSEMOTION
 
         # -----------------------------
         # key codes
@@ -56,6 +57,13 @@ class PygameWrapper(GESublayer):
 
     def new_surface_obj(self, size):
         return self._pygame.surface.Surface(size)
+
+    def surface_transform(self, s1, new_size, dest=None):
+        if dest:
+            r = self._pygame.transform.scale(s1, new_size, dest)
+        else:
+            r = self._pygame.transform.scale(s1, new_size)
+        return r
 
     def new_clock_obj(self, *args, **kwargs):
         return self._pygame.time.Clock()

@@ -8,10 +8,10 @@
 import argparse
 
 from . import subcommand
-from .pyvcli_defs import pyv_vars, VER_DISP_MSG
+from .pyvcli_defs import VER_DISP_MSG
+from .pyvcli_defs import pe_vars
 
-
-__version__ = pyv_vars.ENGINE_VERSION_STR
+__version__ = pe_vars.ENGINE_VERSION_STR
 
 
 CMD_MAPPING = {

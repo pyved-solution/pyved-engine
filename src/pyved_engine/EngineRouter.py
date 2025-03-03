@@ -32,6 +32,8 @@ from .concr_engin import vscreen
 
 
 # insta-bind so other engine parts can rely on this
+from .creep import actors_pattern
+
 pe_vars.ev_manager = EvSystem.EvManager.instance()
 pe_vars.engine_events = EvSystem.EngineEvTypes
 
@@ -73,9 +75,16 @@ class EngineRouter:
         }
         self.ev_source = None
 
+    def get_time(self):
+        return time.time()
+
+    def play_sound(self, name, repeat=0):
+        self._storage.sounds[name].play(repeat)
+
     def preload_assets(self, metadat_dict, prefix_asset_folder=None, prefix_sound_folder=None):
+        print('***** modern pre-loading *******')
         self._storage = AssetsStorage(
-            self.low_level_service, self.gfx,
+            self.low_level_service, self._hub['gfx'],
             metadat_dict, prefix_asset_folder, prefix_sound_folder
         )
         print('engine status: assets are now available')
@@ -83,7 +92,9 @@ class EngineRouter:
         self._hub.update({
             'images': self._storage.images,
             'data': self._storage.data,
-            'sounds': self._storage.sounds
+            'sounds': self._storage.sounds,
+            'spritesheets': self._storage.spritesheets,
+            'csvdata': self._storage.csvdata
         })
 
     @staticmethod
@@ -95,16 +106,17 @@ class EngineRouter:
         return pe_vars.ENGINE_VERSION_STR
 
     def init(self, engine_mode_id: int, maxfps=None, wcaption=None, forced_size=None, cached_paint_ev=None, multistate_info=None) -> None:
-        rez = self.low_level_service.fire_up_backend(engine_mode_id)
-        # TODO use mediator everythime ? instead of EvManager
-        self.mediator = None  # Mediator()
-
         global _engine_rdy, _upscaling_var, _existing_game_ctrl
+
+        if self.ready_flag:
+            return
+        event_source = snd_part_init(self.low_level_service, maxfps, wcaption)
+        self.ev_source = event_source
+
+        rez = self.low_level_service.fire_up_backend(engine_mode_id)
+
         if engine_mode_id is None:
             mode = self.HIGH_RES_MODE
-
-        if not _engine_rdy:
-            self.ev_source = bootstrap_x(self.low_level_service, maxfps, wcaption)
 
         # back to times when we used the _hub file
         # _hub.modules_activation()  # bootstrap done so... all good to fire-up pyv modules
@@ -133,12 +145,11 @@ class EngineRouter:
             _existing_game_ctrl = state_management.StateStackCtrl()
         # the lines above have replaced class named: MyGameCtrl()
         self.ready_flag = True
-        self.low_level_service.init_sound()  # we always enable sounds
 
     def draw_circle(self, surface, color_arg, position2d, radius, width=0):
         self.low_level_service.draw_circle(surface, color_arg, position2d, radius, width)
 
-    def draw_rect(self, surface, color, rect4, width, **kwargs):
+    def draw_rect(self, surface, color, rect4, width=0, **kwargs):
         self.low_level_service.draw_rect(surface, color, rect4, width)
 
     def draw_line(self, *args, **kwargs):
@@ -153,6 +164,12 @@ class EngineRouter:
     # --- legit pyved functions
     def bootstrap_e(self):
         self.low_level_service.fire_up_backend(0)  # TODO
+
+        # TODO use mediator everythime ? instead of EvManager
+        # self.mediator = None  # Mediator()
+        # need to set it in variables other wise all actor-based games wont work
+        from .creep.actors_pattern import Mediator
+        pe_vars.mediator = Mediator()
 
         # >>> EXPLICIT
         # from .sublayer_implem import PygameWrapper
@@ -191,7 +208,6 @@ class EngineRouter:
         self._hub.update({
             'polarbear': polarbear
         })
-        print('---hub in EngineRouter ok')
 
         from .looparts import ascii as _ascii
         # from .looparts import gui as _gui
@@ -202,7 +218,12 @@ class EngineRouter:
             # 'story': story,
         })
 
+        print('---/-/////////////////------------')
+        print('Hub in EngineRouter has been updated')
+
         self.keycodes = CodesProxy(self.low_level_service)
+        # we always enable sounds, so the engine is ready to load datas
+        self.low_level_service.init_sound()
 
     def process_evq(self):
         pe_vars.mediator.update()
@@ -248,6 +269,14 @@ class EngineRouter:
 
     def close_game(self):
         self.low_level_service.quit()
+
+        # pe_vars.gameover = False
+        # dep_linking.pygame.mixer.quit()
+        # dep_linking.pygame.quit()
+        self.images.clear()
+        self.csvdata.clear()
+        self.sounds.clear()
+        self.spritesheets.clear()
 
     def surface_create(self, size):
         return self.low_level_service.new_surface_obj(size)
@@ -298,29 +327,20 @@ _scr_init_flag = False
 
 
 # --- rest of functions ---
-def bootstrap_x(lower_level_svc, maxfps=None, wcaption=None, print_ver_info=True):
+def snd_part_init(lower_level_svc, maxfps=None, wcaption=None, print_ver_info=True):
     global _engine_rdy
     # TODO check when to use mediator
-    pe_vars.mediator = None  # Mediator()
-
     if maxfps is None:
         y = 60
     else:
         y = maxfps
     pe_vars.max_fps = y
-    # in theory the Pyv backend_name can be hacked prior to a pyv.init() call
-    # Now, let's  build a primal backend
-    v = pe_vars.ENGINE_VERSION_STR
-    if print_ver_info:
-        print(f'Booting up pyved-engine {v}...')
 
     # here,
     #  we do heavy lifting to bind the pygame event source with the high-level event manager
 
     from . import abstraction
-
     # (SIDE-EFFECT: Building the backend also sets kengi_inj.pygame )
-
     _pyv_backend = abstraction.build_primalbackend(pe_vars.backend_name)
 
     # CAREFUL: if you dont call the line below,
@@ -398,17 +418,6 @@ def _screen_param(lower_level_svc, gfx_mode_code, screen_dim, cached_paintev) ->
 
 
 _existing_game_ctrl = None
-
-
-def close_game():
-    pe_vars.gameover = False
-    dep_linking.pygame.mixer.quit()
-    dep_linking.pygame.quit()
-
-    pe_vars.images.clear()
-    pe_vars.csvdata.clear()
-    pe_vars.sounds.clear()
-    pe_vars.spritesheets.clear()
 
 
 def curr_state() -> int:

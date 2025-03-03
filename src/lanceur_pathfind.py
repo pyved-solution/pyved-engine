@@ -1,6 +1,7 @@
 from pyved_engine import EngineRouter
+from pyved_engine.abstraction.PygameWrapper import PygameWrapper
 
-pyv = EngineRouter.build()
+pyv = EngineRouter(PygameWrapper())
 pyv.bootstrap_e()
 
 

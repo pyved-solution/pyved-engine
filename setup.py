@@ -13,24 +13,25 @@ if os.path.isfile(requirements_file):
 import sys
 
 sys.path.append('src')
-from pyved_engine import vars
+from pyved_engine.concr_engin import pe_vars
 from setuptools import setup
 
 pck_list = [
     "pyved_engine",
-    "pyved_engine.foundation",
+    "pyved_engine.abstraction",
     "pyved_engine.compo",
-    "pyved_engine.core",
+    "pyved_engine.concr_engin",
+    "pyved_engine.ifaces",
     "pyved_engine.looparts",  # to be sure we get looparts/rogue.py, looparts/tabletop.py, etc.
     "pyved_engine.looparts.ai",
     "pyved_engine.looparts.demolib",
     #"pyved_engine.looparts.gui",
-    'pyved_engine.add_ons.gui',
-    'pyved_engine.add_ons.tmx',
-    "pyved_engine.add_ons.tmx.pytiled_parser",
-    "pyved_engine.add_ons.tmx.pytiled_parser.parsers",
-    "pyved_engine.add_ons.tmx.pytiled_parser.parsers.json",
-    "pyved_engine.add_ons.tmx.pytiled_parser.parsers.tmx",
+    'pyved_engine.looparts.gui',
+    'pyved_engine.looparts.tmx',
+    "pyved_engine.looparts.tmx.pytiled_parser",
+    "pyved_engine.looparts.tmx.pytiled_parser.parsers",
+    "pyved_engine.looparts.tmx.pytiled_parser.parsers.json",
+    "pyved_engine.looparts.tmx.pytiled_parser.parsers.tmx",
 
     #"pyved_engine.looparts.isometric",
     #"pyved_engine.looparts.polarbear",
@@ -45,7 +46,7 @@ long_desc = (this_directory / "README.md").read_text()
 
 setup(
     name='pyved-engine',
-    version=str(vars.ENGINE_VERSION_STR),
+    version=str(pe_vars.ENGINE_VERSION_STR),
 
     description='Custom game engine built upon python/pygame',
     long_description=long_desc,

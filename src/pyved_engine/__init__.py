@@ -20,6 +20,7 @@ from .compo.GameTpl import GameTpl  # legacy cls
 # from .foundation import legacy_evs  # we just copy the event system of pygame
 from .abstraction.EvSystem import Emitter, EvListener, EngineEvTypes
 from .concr_engin import pe_vars as defs
+from . import hub
 
 
 # TODO remove this when we can
@@ -33,7 +34,13 @@ _stored_kbackend = None
 defs.weblib_sig = _backend_name = ''  # deprec.
 
 
+def get_engine_router():
+    from .EngineRouter import EngineRouter
+    from .abstraction.PygameWrapper import PygameWrapper
+    return EngineRouter(PygameWrapper())
+
+
 def set_webbackend_type(xval):
     global _backend_name
-    vars.weblib_sig = _backend_name = xval
-    vars.backend_name = 'web'
+    defs.weblib_sig = _backend_name = xval
+    defs.backend_name = 'web'

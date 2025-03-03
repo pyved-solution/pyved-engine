@@ -196,7 +196,7 @@ class KengiEv:
 
 # below is a read-only value,
 # to retrieve this value from outside you can call pyv.get_version()
-ENGINE_VERSION_STR = '25.1a1'
+ENGINE_VERSION_STR = '25.3a1'
 
 DATA_FT_SIZE = 16
 

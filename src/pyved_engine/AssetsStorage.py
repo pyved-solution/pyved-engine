@@ -41,6 +41,8 @@ class AssetsStorage:
         self.fonts = dict()
         self.spritesheets = dict()
 
+        self.csvdata = dict()  # add-on
+
         if debug_mode:
             print('*' * 50)
             print(f' CALL to preload assets [webhack value:{webhack}]')
