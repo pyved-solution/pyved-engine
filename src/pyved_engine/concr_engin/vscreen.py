@@ -4,7 +4,6 @@ from ..concr_engin import core
 _vsurface = None
 _vsurface_required = True
 _is_scr_init = False
-game_window_size = None
 offsets = [0, 0]
 
 cached_pygame_mod = None  # init from outside when one calls kengi.bootstrap_e
@@ -17,6 +16,9 @@ canvas_emuvram = None
 canvas_rendering = None
 real_pygamescreen = None
 screen_rank = 1  # so we can detect whenever its required to update the var in the PAINT engine event
+
+game_window_size = [None, None]
+stored_lambda = 1
 
 # ------------------------------------
 #   old code
@@ -39,38 +41,45 @@ def conv_to_vscreen(x, y):
     return int(x / stored_upscaling), int(y / stored_upscaling)
 
 
+def refresh_screen_params(size):
+    newval_w, newval_h = size
+    global _vsurface, stored_upscaling, game_window_size, offsets
+    print('## refresh screen ##', size, newval_w, newval_h)
+    game_window_size[0], game_window_size[1] = 160 * stored_lambda, 90 * stored_lambda
+    prev_k_factor = 1
+    k_candidate = 2
+    while (k_candidate*game_window_size[0]) < newval_w+1 and (k_candidate*game_window_size[1]) < newval_h+1:
+        prev_k_factor = k_candidate
+        k_candidate += 1
+    stored_upscaling = prev_k_factor
+
+    print('disp:', size)
+    disp_w, disp_h = size
+    print(f'lambda={stored_lambda}  ; CALC Window {game_window_size}:upscale={stored_upscaling}:offsets={offsets}')
+    widget_s = [stored_upscaling*game_window_size[0], stored_upscaling*game_window_size[1]]
+    offsets[0], offsets[1] = (disp_w-widget_s[0]) // 2,  (disp_h-widget_s[1]) // 2
+
+
 def do_screen_param(lower_level_svc, lambda_factor, display_size, cached_paintev) -> None:
     """
     :param lambda_factor: in the range 1-3. Multiplier applied to 160x90 to comptute the game window (no upscaling)
     :param display_size: how many pixels on the screen e.g. 1920x1080
     :param cached_paintev: can be None or a pyved event that needs to have its .screen attribute set
     """
-    global _vsurface, real_pygamescreen
-    global _is_scr_init, stored_upscaling, game_window_size
+    global _vsurface, real_pygamescreen, stored_lambda
+    global _is_scr_init, stored_upscaling
     if _is_scr_init:
         raise RuntimeError('cannot init screen more than once!')
 
     if not isinstance(lambda_factor, int) or not (0 < lambda_factor < 5):
         raise ValueError('invalid lamda factor!')
 
-    game_window_size = (
-        160 * lambda_factor,
-        90 * lambda_factor
-    )
-    real_pygamescreen = lower_level_svc.display.get_surface()
-    _vsurface = lower_level_svc.new_surface_obj(game_window_size)
-    disp_w, disp_h = display_size
+    stored_lambda = lambda_factor
+    real_pygamescreen = lower_level_svc.display.get_surface()  # assert its size == display_size
+    refresh_screen_params(display_size)  #real_pygamescreen.get_size())
 
-    prev_k_factor = 1
-    k_candidate = 2
-    while (k_candidate*game_window_size[0]) < disp_w+1 and (k_candidate*game_window_size[1]) < disp_h+1:
-        prev_k_factor = k_candidate
-        k_candidate += 1
-    stored_upscaling = prev_k_factor
-    print('disp:', display_size)
-    print(f'lambda={lambda_factor}  ; CALC Window {game_window_size}:upscale={stored_upscaling}:offsets={offsets}')
-    widget_s = [stored_upscaling*game_window_size[0], stored_upscaling*game_window_size[1]]
-    offsets[0], offsets[1] = (disp_w-widget_s[0]) // 2,  (disp_h-widget_s[1]) // 2
+    _vsurface = lower_level_svc.new_surface_obj(game_window_size)
+
     # from here and below,
     # we know the gfx_mode_code is valid 100%
     # conventionw, conventionh = pe_vars.disp_size

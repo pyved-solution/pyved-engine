@@ -96,11 +96,19 @@ class PygameEvSource(DeepEvSource):
         raw_pyg_events = self._pygame_mod.event.get()
         del self._ev_storage[:]
 
+        # ------------------------
+        #  a very special event has to be handled
+        # ------------------------
+        # type=VIDEORESIZE args=(size, w, h)
+
         for pyev in raw_pyg_events:
             r = None
+            if pyev.type == self._pygame_mod.VIDEORESIZE:
+                vscreen.refresh_screen_params(pyev.size)  #, pyev.w, pyev.h)
+
             # for convenient gamepad support, we will
             # map pygame JOY* in a specialized way (xbox360 pad support)
-            if pyev.type == cst_joyaxismotion:
+            elif pyev.type == cst_joyaxismotion:
                 if pyev.axis in (0, 1):
                     self.lstick_val_cache[pyev.axis] = pyev.value
                     r = (EngineEvTypes.Stickmotion, {'side': 'left', 'pos': tuple(self.lstick_val_cache)})
@@ -136,9 +144,11 @@ class PygameEvSource(DeepEvSource):
             else:
                 r = (self._map_etype2kengi(pyev.type), pyev.dict)
 
-            if r[0] in (EngineEvTypes.Mousedown, EngineEvTypes.Mouseup, EngineEvTypes.Mousemotion):
-                r[1]['pos'] = vscreen.proj_to_vscreen(r[1]['pos'])
-                # TODO what about rel??
-            self._ev_storage.append(KengiEv(r[0], **r[1]))
+            # modify mouse events
+            if r is not None:  # some events are ignored
+                if r[0] in (EngineEvTypes.Mousedown, EngineEvTypes.Mouseup, EngineEvTypes.Mousemotion):
+                    r[1]['pos'] = vscreen.proj_to_vscreen(r[1]['pos'])
+                    # TODO what about rel??
+                self._ev_storage.append(KengiEv(r[0], **r[1]))
 
         return self._ev_storage
