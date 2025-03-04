@@ -2,10 +2,10 @@ import base64
 import io
 from abc import abstractmethod
 from collections import defaultdict
-
 from . import packed_capello_ft
 from .SpriteSheet import SpriteSheet as JsonBasedSprSheet
-# from .. import _hub
+from .. import hub
+from ..concr_engin import pe_vars
 
 
 class BaseCfont:
@@ -159,7 +159,7 @@ class EmbeddedCfont(BaseCfont):
         )
 
 
-class Spritesheet:
+class LegacySpritesheet:
     """
     handles sprite sheets in an optimized way!
     REMARK: When calling images_at the rect is the format: (x, y, x + offset, y + offset)
@@ -170,13 +170,13 @@ class Spritesheet:
         :param resource_info: either pygame.Surface or filepath
         :param chosen_scale:
         """
-        if isinstance(resource_info, _hub.pygame.Surface):
-            self._sheet = resource_info
-        else:
-            self._sheet = _hub.pygame.image.load(resource_info).convert()
+        #if isinstance(resource_info, _hub.pygame.Surface):
+        self._sheet = resource_info  # -->surface =forced type
+        # else:
+        #    self._sheet = _hub.pygame.image.load(resource_info).convert()
 
         if float(chosen_scale) != 1.0:
-            homo = _hub.pygame.transform.scale
+            homo = hub.engine_ref.surface_transform
             w, h = self._sheet.get_size()
             self._sheet = homo(self._sheet, (chosen_scale * w, chosen_scale * h))
 
@@ -230,7 +230,6 @@ class Spritesheet:
     def _cache_update(self):
         # re - populate the whole cache!
         self.cache.clear()
-        pg = _hub.pygame
 
         if self._tilesize is None:
             return
@@ -241,7 +240,7 @@ class Spritesheet:
             for column in range(1, self._per_line_img_quant + 1):
                 adhocx = -tile_w + column * tile_w + (column - 1) * self._spacing
                 adhocy = -tile_h + curr_line * tile_h + (curr_line - 1) * self._spacing
-                decoupe = pg.Rect(adhocx, adhocy, tile_w, tile_h)
+                decoupe = hub.engine_ref.new_rect_obj(adhocx, adhocy, tile_w, tile_h)
                 y = self._sheet.subsurface(decoupe)
                 if self._colorkey is not None:
                     y.set_colorkey(self._colorkey)
@@ -282,7 +281,7 @@ class Spritesheet:
             tw, th = self._tilesize
             # map kval -> to a rect
             i, j = kval % self._per_line_img_quant, int(kval / self._per_line_img_quant)
-            rect_obj = _hub.pygame.Rect(i * tw, j * th, tw, th)
+            rect_obj = hub.engine_ref.new_rect_obj(i * tw, j * th, tw, th)
             # crop from the sheet save & return the result
             y = self.cache[kval] = self.image_at(rect_obj)
         return y

@@ -30,12 +30,15 @@ class PygameWrapper(GESublayer):
         # copy many pygame constants
         self.SRCALPHA = self._pygame.SRCALPHA
         self.RLEACCEL = self._pygame.RLEACCEL
-        self.QUIT = self._pygame.QUIT
-        self.KEYDOWN = self._pygame.KEYDOWN
-        self.KEYUP = self._pygame.KEYUP
-        self.MOUSEBUTTONDOWN = self._pygame.MOUSEBUTTONDOWN
-        self.MOUSEBUTTONUP = self._pygame.MOUSEBUTTONUP
-        self.MOUSEMOTION = self._pygame.MOUSEMOTION
+
+        # STOP using these as we create a higher-level of abstraction event system,
+        # see EngineEvTypes
+        # self.QUIT = self._pygame.QUIT
+        # self.KEYDOWN = self._pygame.KEYDOWN
+        # self.KEYUP = self._pygame.KEYUP
+        # self.MOUSEBUTTONDOWN = self._pygame.MOUSEBUTTONDOWN
+        # self.MOUSEBUTTONUP = self._pygame.MOUSEBUTTONUP
+        # self.MOUSEMOTION = self._pygame.MOUSEMOTION
 
         # -----------------------------
         # key codes
@@ -44,10 +47,38 @@ class PygameWrapper(GESublayer):
         self.K_BACKSPACE = self._pygame.K_BACKSPACE
         self.K_RETURN = self._pygame.K_RETURN
         self.K_SPACE = self._pygame.K_SPACE
+        # key arrows
         self.K_UP = self._pygame.K_UP
         self.K_LEFT = self._pygame.K_LEFT
         self.K_DOWN = self._pygame.K_DOWN
         self.K_RIGHT = self._pygame.K_RIGHT
+        # letters
+        self.K_a = self._pygame.K_a
+        self.K_b = self._pygame.K_b
+        self.K_c = self._pygame.K_c
+        self.K_d = self._pygame.K_d
+        self.K_e = self._pygame.K_e
+        self.K_f = self._pygame.K_f
+        self.K_g = self._pygame.K_g
+        self.K_h = self._pygame.K_h
+        self.K_i = self._pygame.K_i
+        self.K_j = self._pygame.K_j
+        self.K_k = self._pygame.K_k
+        self.K_l = self._pygame.K_l
+        self.K_m = self._pygame.K_m
+        self.K_n = self._pygame.K_n
+        self.K_o = self._pygame.K_o
+        self.K_p = self._pygame.K_p
+        self.K_q = self._pygame.K_q
+        self.K_r = self._pygame.K_r
+        self.K_s = self._pygame.K_s
+        self.K_t = self._pygame.K_t
+        self.K_u = self._pygame.K_u
+        self.K_v = self._pygame.K_v
+        self.K_w = self._pygame.K_w
+        self.K_x = self._pygame.K_x
+        self.K_y = self._pygame.K_y
+        self.K_z = self._pygame.K_z
 
     def get_pressed(self):
         return self._pygame.key.get_pressed()
@@ -56,9 +87,9 @@ class PygameWrapper(GESublayer):
         print('allumage --Pygame--')
         self._pygame.display.set_mode(
             # args[0]  # deprecated: back when the user was able to select scr size...
-            # (1200, 675),
-            (0, 0),
-            flags=self._pygame.FULLSCREEN  #self._pygame.RESIZABLE
+            (1366, 768),
+            # (0, 0),
+            flags=self._pygame.RESIZABLE
         )
 
     def new_surface_obj(self, size):

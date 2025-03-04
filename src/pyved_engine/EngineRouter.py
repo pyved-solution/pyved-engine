@@ -30,7 +30,7 @@ from .abstraction import PygameWrapper  # Step 3: Inject the dependency
 from .concr_engin.pe_vars import screen
 from .concr_engin import vscreen as screen_mo
 from .concr_engin import vscreen
-
+from . import hub
 
 # insta-bind so other engine parts can rely on this
 from .creep import actors_pattern
@@ -46,7 +46,7 @@ class CodesProxy:
     def __getattr__(self, item):
         if hasattr(self.sl, item):
             return getattr(self.sl, item)
-        print('cannot find keycode:', item)
+        print(f'[WARNING] Cant find keycode {item} in sublayer compo')
 
 
 class EngineRouter:
@@ -75,6 +75,7 @@ class EngineRouter:
             'sprite_collision': self.low_level_service.sprite.spritecollide
         }
         self.ev_source = None
+        hub.engine_ref = self
 
     def get_time(self):
         return time.time()
@@ -106,7 +107,8 @@ class EngineRouter:
     def get_version():
         return pe_vars.ENGINE_VERSION_STR
 
-    def init(self, engine_mode_id: int, maxfps=None, wcaption=None, forced_size=None, cached_paint_ev=None, multistate_info=None) -> None:
+    def init(self, engine_mode_id: int, maxfps=None, wcaption=None, forced_size=None, cached_paint_ev=None,
+             multistate_info=None) -> None:
         global _engine_rdy, _upscaling_var, _existing_game_ctrl
 
         if self.ready_flag:
@@ -194,7 +196,11 @@ class EngineRouter:
         from .abstraction.EvSystem import game_events_enum
         from .creep import actors_pattern
         from . import defs
+        from .patterns import ecs
+        from .looparts import rogue
         self._hub.update({
+            'ecs': ecs,
+            'rogue': rogue,
             'states': state_management,
             'defs': defs,
             'gfx': gfx,
@@ -233,6 +239,10 @@ class EngineRouter:
     def process_evq(self):
         pe_vars.mediator.update()
 
+    def set_gameover(self, bval: bool = True):
+        pe_vars.gameover = bval
+        print('[EngineRouter]->direct signal of game termination received')
+
     def post_ev(self, evtype, **ev_raw_data):
         if self.debug_mode:
             if evtype != 'update' and evtype != 'draw':
@@ -240,7 +250,8 @@ class EngineRouter:
         if evtype not in pe_vars.omega_events:
             raise ValueError(f'trying to post event {evtype}, but this one hasnt been declared via pyv.setup_evsys6')
         if evtype[0] == 'x' and evtype[1] == '_':  # cross event
-            pe_vars.mediator.post(evtype, ev_raw_data, True)  # keep the raw form if we need to push to antother mediator
+            pe_vars.mediator.post(evtype, ev_raw_data,
+                                  True)  # keep the raw form if we need to push to antother mediator
         else:
             pe_vars.mediator.post(evtype, ev_raw_data, False)
 
@@ -310,6 +321,7 @@ class EngineRouter:
                     self.flip()  # commit gfx mem to screen, already contains the .tick
                     await asyncio.sleep(0)
                 endfunc(None)
+
             asyncio.run(async_run_game())
 
     # --- trick to use either the hub or the sublayer
@@ -374,7 +386,6 @@ def curr_statename() -> str:
     return state_management.stack_based_ctrl.state_code_to_str(
         state_management.stack_based_ctrl.current
     )
-
 
 # -------
 #  september 23 version. It did break upscalin in web ctx
