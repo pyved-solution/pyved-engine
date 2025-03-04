@@ -4,6 +4,7 @@ Contains the implementation of each and every sub_command that should be called 
 private function start with the character '_'
 """
 import importlib
+import importlib.util
 import json
 import os
 import shutil
@@ -256,6 +257,56 @@ def refresh(bundle_name):
     _utils.save_list_of_py_files(os.path.join(bundle_name, 'cartridge'), my_metadat)
     _utils.save_list_of_assets(os.path.join(bundle_name, 'cartridge'), my_metadat)
     _utils.rewrite_metadata(bundle_name, my_metadat)
+
+
+def serve(bundle_name, devflag_on: bool) -> None:
+    # Print the bundle name for debugging purposes.
+    print('arg0:', bundle_name)
+
+    # Build the expected directory and file path for the server script.
+    server_dir = os.path.join(bundle_name, 'servercode')
+    server_script_path = os.path.join(server_dir, 'run.py')
+
+    if not os.path.isfile(server_script_path):
+        print(f'No server script found in bundle "{bundle_name}".')
+        print('It appears this game does not support multiplayer/server functionality.')
+        return
+
+    print(f"Server script found at {server_script_path}. Launching server...")
+
+    if devflag_on:
+        print("Developer flag is ON. Running server in development mode.")
+
+    # Add the bundle directory to sys.path to allow package-relative imports.
+    bundle_abs_path = os.path.abspath(bundle_name)
+    if bundle_abs_path not in sys.path:
+        sys.path.insert(0, bundle_abs_path)
+
+    # >try:
+    # Import the server module as part of the servercode package.
+
+    # TODO how to achiev this in web context?
+    # dep injection , the old-school way
+    mvars = importlib.import_module("servercode.glvars")
+    from pyved_engine.EngineRouter import EngineRouter
+    from pyved_engine.abstraction.PygameWrapper import PygameWrapper
+    mvars.pyv = pyv = EngineRouter(PygameWrapper())
+    mvars.pyv.bootstrap_e()
+    # TODO should bind a mediator
+    netw_layer = pyv.neotech.Objectifier(**pyv.neotech.build_net_layer('socket', 'server'))
+    mediator = pyv.neotech.UMediator()
+    mediator.set_network_layer(netw_layer)
+
+    mvars.mediator = mediator  # so the game can also use
+    # .done
+
+    server_module = importlib.import_module("servercode.run")
+    # Optionally, if there's an entry function, call it.
+    # if hasattr(server_module, "main"):
+    server_module.main()
+
+    # >except Exception as e:
+    # >   print(f"Error running the server script: {e}")
 
 
 def share(bundle_name, dev_flag_on):

@@ -19,6 +19,7 @@ CMD_MAPPING = {
     'bump': subcommand.bump,
     'init': subcommand.init,
     'play': subcommand.play,
+    'serve': subcommand.serve,
     'pub': None,
     'refresh': subcommand.refresh,
     'share': subcommand.share,
@@ -251,7 +252,7 @@ def _remove_junk_from_bundle_name(x):
 def main_inner(parser, argns):
     # definitions
     no_arg_subcommands = {'autogen'}
-    extra_flags_subcommands = {'share', 'play'}  # mark all subcommands that use the 'dev' mode flag
+    extra_flags_subcommands = {'share', 'play', 'serve'}  # mark all subcommands that use the 'dev' mode flag
 
     # the algorithm
     ope_name = argns.subcommand
@@ -697,6 +698,15 @@ def do_parse_args():
     )
     play_parser.add_argument(
         "bundle_name", type=str
+    )
+
+    # ——————————————————————————————————
+    # +++ SERVE subcommand {
+    share_parser = subparsers.add_parser(
+        "serve", help="run the servercode, for a given game bundle"
+    )
+    share_parser.add_argument(
+        "bundle_name", type=str, nargs="?", default=".", help="Specified bundle (default: current folder)"
     )
 
     # ——————————————————————————————————

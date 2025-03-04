@@ -61,6 +61,7 @@ class EngineRouter:
 
     def __init__(self, sublayer_compo):  # TODO injection should be done elsewhere
         # sublayer_compo: GESublayer (type)
+        self.bypass_event_type_checking = False
 
         core.set_sublayer(sublayer_compo)
         core.save_engine_ref(self)
@@ -178,7 +179,8 @@ class EngineRouter:
         # self.mediator = None  # Mediator()
         # need to set it in variables other wise all actor-based games wont work
         from .creep.actors_pattern import Mediator
-        pe_vars.mediator = Mediator()
+
+        pe_vars.mediator = Mediator()  # TODO need to decide if it's instanciated HERE or when client game is launched
 
         # >>> EXPLICIT
         # from .sublayer_implem import PygameWrapper
@@ -200,7 +202,9 @@ class EngineRouter:
         from . import defs
         from .patterns import ecs
         from .looparts import rogue
+        from .import umediator
         self._hub.update({
+            'neotech': umediator,
             'ecs': ecs,
             'rogue': rogue,
             'states': state_management,
@@ -245,12 +249,21 @@ class EngineRouter:
         pe_vars.gameover = bval
         print('[EngineRouter]->direct signal of game termination received')
 
+    # can be used to replace the default mediator [hack for .neotech]
+    def use_mediator(self, ref_m):
+        pe_vars.mediator = ref_m
+        self.bypass_event_type_checking = True
+        print('  >>using experimental Umediator Obj<<')
+
     def post_ev(self, evtype, **ev_raw_data):
         if self.debug_mode:
             if evtype != 'update' and evtype != 'draw':
                 print('>>>>POST', evtype, ev_raw_data)
-        if evtype not in pe_vars.omega_events:
-            raise ValueError(f'trying to post event {evtype}, but this one hasnt been declared via pyv.setup_evsys6')
+
+        if not self.bypass_event_type_checking:
+            if evtype not in pe_vars.omega_events:
+                raise ValueError(f'trying to post event {evtype}, but this one hasnt been declared')
+
         if evtype[0] == 'x' and evtype[1] == '_':  # cross event
             pe_vars.mediator.post(evtype, ev_raw_data,
                                   True)  # keep the raw form if we need to push to antother mediator
