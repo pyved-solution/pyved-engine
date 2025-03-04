@@ -9,6 +9,7 @@ offsets = [0, 0]
 cached_pygame_mod = None  # init from outside when one calls kengi.bootstrap_e
 special_flip = 0  # flag, set it to 1 when using web ctx
 stored_upscaling = 1
+fullscreen_flag = False
 
 # hopefully i will be able to simplify this:
 ctx_emuvram = None
@@ -41,10 +42,10 @@ def conv_to_vscreen(x, y):
     return int(x / stored_upscaling), int(y / stored_upscaling)
 
 
-def refresh_screen_params(size):
+def refresh_screen_params(size, realscreen=None):
+    global _vsurface, stored_upscaling, game_window_size, offsets, real_pygamescreen
     newval_w, newval_h = size
-    global _vsurface, stored_upscaling, game_window_size, offsets
-    print('## refresh screen ##', size, newval_w, newval_h)
+    print('## refresh screen ##', size)
     game_window_size[0], game_window_size[1] = 160 * stored_lambda, 90 * stored_lambda
     prev_k_factor = 1
     k_candidate = 2
@@ -58,6 +59,9 @@ def refresh_screen_params(size):
     print(f'lambda={stored_lambda}  ; CALC Window {game_window_size}:upscale={stored_upscaling}:offsets={offsets}')
     widget_s = [stored_upscaling*game_window_size[0], stored_upscaling*game_window_size[1]]
     offsets[0], offsets[1] = (disp_w-widget_s[0]) // 2,  (disp_h-widget_s[1]) // 2
+
+    if realscreen:
+        real_pygamescreen = realscreen
 
 
 def do_screen_param(lower_level_svc, lambda_factor, display_size, cached_paintev) -> None:
@@ -75,10 +79,12 @@ def do_screen_param(lower_level_svc, lambda_factor, display_size, cached_paintev
         raise ValueError('invalid lamda factor!')
 
     stored_lambda = lambda_factor
-    real_pygamescreen = lower_level_svc.display.get_surface()  # assert its size == display_size
     refresh_screen_params(display_size)  #real_pygamescreen.get_size())
 
     _vsurface = lower_level_svc.new_surface_obj(game_window_size)
+    pe_vars.screen = _vsurface
+    if cached_paintev:
+        cached_paintev.screen = _vsurface
 
     # from here and below,
     # we know the gfx_mode_code is valid 100%
@@ -113,9 +119,7 @@ def do_screen_param(lower_level_svc, lambda_factor, display_size, cached_paintev
     #         # this line is useful for enabling mouse_pos computations even in webCtx
     #         stored_upscaling = float(adhoc_upscaling)
 
-    pe_vars.screen = _vsurface
-    if cached_paintev:
-        cached_paintev.screen = _vsurface
+    real_pygamescreen = lower_level_svc.display.get_surface()  # assert its size == display_size
     _is_scr_init = True
 
 

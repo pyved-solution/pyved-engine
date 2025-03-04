@@ -106,6 +106,23 @@ class PygameEvSource(DeepEvSource):
             if pyev.type == self._pygame_mod.VIDEORESIZE:
                 vscreen.refresh_screen_params(pyev.size)  #, pyev.w, pyev.h)
 
+            elif pyev.type == 768 and pyev.key == self._pygame_mod.K_F11:  # keydown F11
+                    if not vscreen.fullscreen_flag:
+                        disp = self._pygame_mod.display.set_mode((0, 0), self._pygame_mod.FULLSCREEN)
+                        vscreen.refresh_screen_params(
+                            disp.get_size(), realscreen=disp
+                        )
+                        vscreen.fullscreen_flag = True
+            elif pyev.type == 768 and pyev.key == self._pygame_mod.K_ESCAPE and vscreen.fullscreen_flag:
+                # - WARNING -
+                # this needs to be the same value in PygameWrapper
+                CSIZE = (1366, 768)
+                disp = self._pygame_mod.display.set_mode(CSIZE, self._pygame_mod.RESIZABLE)
+                vscreen.refresh_screen_params(
+                    CSIZE, realscreen=disp
+                )
+                vscreen.fullscreen_flag = False
+
             # for convenient gamepad support, we will
             # map pygame JOY* in a specialized way (xbox360 pad support)
             elif pyev.type == cst_joyaxismotion:
