@@ -20,6 +20,8 @@ aware of the engine inner structure
 
 import time
 from math import degrees as _degrees
+
+from .abstraction.PygameEvSource import PygameEvSource
 from .concr_engin import core
 from .concr_engin import pe_vars
 from . import state_management
@@ -113,7 +115,7 @@ class EngineRouter:
 
         if self.ready_flag:
             return
-        event_source = snd_part_init(self.low_level_service, maxfps, wcaption)
+        event_source = second_phase_init(self.low_level_service, maxfps, wcaption)
         self.ev_source = event_source
 
         rez = self.low_level_service.fire_up_backend(engine_mode_id)
@@ -344,7 +346,7 @@ _scr_init_flag = False
 
 
 # --- rest of functions ---
-def snd_part_init(lower_level_svc, maxfps=None, wcaption=None, print_ver_info=True):
+def second_phase_init(lower_level_svc, maxfps=None, wcaption=None, print_ver_info=True):
     global _engine_rdy
     # TODO check when to use mediator
     if maxfps is None:
@@ -356,20 +358,64 @@ def snd_part_init(lower_level_svc, maxfps=None, wcaption=None, print_ver_info=Tr
     # here,
     #  we do heavy lifting to bind the pygame event source with the high-level event manager
 
-    from . import abstraction
+    #from . import abstraction
+    #_pyv_backend = abstraction.build_primalbackend(pe_vars.backend_name)
     # (SIDE-EFFECT: Building the backend also sets kengi_inj.pygame )
-    _pyv_backend = abstraction.build_primalbackend(pe_vars.backend_name)
+
+    # TODO one item in the long sequence of dep. injections is to be found there:
+    #  check where to put the rest
+    oneof_pyv_backend = PygameEvSource()
+
+    # pbe_identifier: str / values accepted -> to make a valid func. call you would either pass '' or 'web'
+    # libbundle_ver: str
+
+    # --------------
+    # deprecated:
+    #  linking with the ev-source in the web-ctx looked like this
+    # --------------
+    # elif pbe_identifier == 'web':
+    #     if libbundle_ver is None:
+    #         if vars.weblib_sig is None or len(vars.weblib_sig) < 1:
+    #             raise ValueError('since you use the web backend you HAVE TO specify libbundle_ver !!')
+    #         else:
+    #             adhoc_ver = vars.weblib_sig
+    #     else:
+    #         adhoc_ver = libbundle_ver
+    #     # assumed that (injector entry 'web_pbackend') => (module==web_pbackend.py & cls==WebPbackend)
+    #     # for example:
+    #     modulename = 'web_pbackend'
+    #     BackendAdhocClass = getattr(_hub.get_injector()[modulename], to_camelcase(modulename))
+    #     print('   *inside build_primalbackend*  adhoc class is ', BackendAdhocClass)
+    #     # web backends need to ver. info. in great details!
+    #     return BackendAdhocClass(adhoc_ver)
+
+    # --------- other dep injection may be this:
+    # we shall ALSO
+    # define+inject standard transport layers for events that are "cross-events":
+    #  - network layer based on sockets
+    #  - network layer based on websockets
+
+    # deep_ev_source_cls = 'PygameEvSource'
+    # ws_transport_cls = 'WsTransportLocalCtx'
+
+    # then use importlib to load stuff.
+    # in that way, we'll be able to reconfigure at runtime!
+    # For example:
+
+    # deep_ev_source_cls = 'CanvasBasedEvSource'
+    # ws_transport_cls = 'WsTransportWebCtx'
+
 
     # CAREFUL: if you dont call the line below,
     # the high level event system wont work (program hanging)
-    EvSystem.EvManager.instance().a_event_source = _pyv_backend
+    EvSystem.EvManager.instance().a_event_source = oneof_pyv_backend
 
     lower_level_svc.init()
     if wcaption:
         lower_level_svc.set_caption(wcaption)
     _engine_rdy = True
 
-    return _pyv_backend  # returns a engine-compatible event source
+    return oneof_pyv_backend  # returns a engine-compatible event source
 
 
 _existing_game_ctrl = None

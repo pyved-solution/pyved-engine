@@ -101,6 +101,16 @@ class PygameEvSource(DeepEvSource):
         # ------------------------
         # type=VIDEORESIZE args=(size, w, h)
 
+        def exit_fullscreen():
+            # - WARNING -
+            # this needs to be the same value in PygameWrapper
+            CSIZE = (1366, 768)
+            new_disp = self._pygame_mod.display.set_mode(CSIZE, self._pygame_mod.RESIZABLE)
+            vscreen.refresh_screen_params(
+                CSIZE, realscreen=new_disp
+            )
+            vscreen.fullscreen_flag = False
+
         for pyev in raw_pyg_events:
             r = None
             if pyev.type == self._pygame_mod.VIDEORESIZE:
@@ -108,7 +118,9 @@ class PygameEvSource(DeepEvSource):
 
             elif hasattr(pyev, 'key') and pyev.key == self._pygame_mod.K_F11:  # F11 interaction
                 if pyev.type == 768:  # keydown
-                    if not vscreen.fullscreen_flag:
+                    if vscreen.fullscreen_flag:
+                        exit_fullscreen()
+                    else:
                         disp = self._pygame_mod.display.set_mode((0, 0), self._pygame_mod.FULLSCREEN)
                         vscreen.refresh_screen_params(
                             disp.get_size(), realscreen=disp
@@ -117,14 +129,7 @@ class PygameEvSource(DeepEvSource):
                 # the keyup will be automatically ignored due to how we built the if ... condition
             elif hasattr(pyev, 'key') and pyev.key == self._pygame_mod.K_ESCAPE:
                 if pyev.type == 768 and vscreen.fullscreen_flag:
-                    # - WARNING -
-                    # this needs to be the same value in PygameWrapper
-                    CSIZE = (1366, 768)
-                    disp = self._pygame_mod.display.set_mode(CSIZE, self._pygame_mod.RESIZABLE)
-                    vscreen.refresh_screen_params(
-                        CSIZE, realscreen=disp
-                    )
-                    vscreen.fullscreen_flag = False
+                    exit_fullscreen()
                 # also: need to forward informations about the escape key
                 r = (self._map_etype2kengi(pyev.type), pyev.dict)
 
