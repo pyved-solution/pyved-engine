@@ -104,24 +104,29 @@ class PygameEvSource(DeepEvSource):
         for pyev in raw_pyg_events:
             r = None
             if pyev.type == self._pygame_mod.VIDEORESIZE:
-                vscreen.refresh_screen_params(pyev.size)  #, pyev.w, pyev.h)
+                vscreen.refresh_screen_params(pyev.size)
 
-            elif pyev.type == 768 and pyev.key == self._pygame_mod.K_F11:  # keydown F11
+            elif hasattr(pyev, 'key') and pyev.key == self._pygame_mod.K_F11:  # F11 interaction
+                if pyev.type == 768:  # keydown
                     if not vscreen.fullscreen_flag:
                         disp = self._pygame_mod.display.set_mode((0, 0), self._pygame_mod.FULLSCREEN)
                         vscreen.refresh_screen_params(
                             disp.get_size(), realscreen=disp
                         )
                         vscreen.fullscreen_flag = True
-            elif pyev.type == 768 and pyev.key == self._pygame_mod.K_ESCAPE and vscreen.fullscreen_flag:
-                # - WARNING -
-                # this needs to be the same value in PygameWrapper
-                CSIZE = (1366, 768)
-                disp = self._pygame_mod.display.set_mode(CSIZE, self._pygame_mod.RESIZABLE)
-                vscreen.refresh_screen_params(
-                    CSIZE, realscreen=disp
-                )
-                vscreen.fullscreen_flag = False
+                # the keyup will be automatically ignored due to how we built the if ... condition
+            elif hasattr(pyev, 'key') and pyev.key == self._pygame_mod.K_ESCAPE:
+                if pyev.type == 768 and vscreen.fullscreen_flag:
+                    # - WARNING -
+                    # this needs to be the same value in PygameWrapper
+                    CSIZE = (1366, 768)
+                    disp = self._pygame_mod.display.set_mode(CSIZE, self._pygame_mod.RESIZABLE)
+                    vscreen.refresh_screen_params(
+                        CSIZE, realscreen=disp
+                    )
+                    vscreen.fullscreen_flag = False
+                # also: need to forward informations about the escape key
+                r = (self._map_etype2kengi(pyev.type), pyev.dict)
 
             # for convenient gamepad support, we will
             # map pygame JOY* in a specialized way (xbox360 pad support)
