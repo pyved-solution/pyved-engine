@@ -214,13 +214,18 @@ def init(chosen_slug: str) -> None:
     print('Go ahead and have fun ;)')
 
 
-def play(x, devflag_on):
+def play(x, **kwargs):
+    devflag_on = kwargs['dev']
+    print('dans la cmd', kwargs)
     if '.' != x and os.path.isdir('cartridge'):
         raise ValueError('launching with a "cartridge" in the current folder, but no parameter "." is forbidden')
 
-    metadata = None
+    # ------------------------
+    #  just checking for errors, on metadat.json
+    # ------------------------
+    mdata_path = os.path.join(x, 'cartridge', 'metadat.json')
     try:
-        with open(os.path.join(x, 'cartridge', 'metadat.json'), 'r') as fptr:
+        with open(mdata_path, 'r') as fptr:
             print(f"game bundle {x} found. Reading metadata...")
             metadata = json.load(fptr)
         # - debug
@@ -241,8 +246,9 @@ def play(x, devflag_on):
         print('  Are you sure it exists in the current folder? Alternatively you can try to')
         print('  change directory (cd) and simply type `pyv-cli play`')
         print('  once you are inside the bundle')
-    if metadata:
-        vmsl.bootgame(metadata)
+
+    # At this point: can assume metadata is available and error-free...
+    vmsl.boot_game(mdata_path, **kwargs)
 
 
 def refresh(bundle_name):
@@ -259,23 +265,24 @@ def refresh(bundle_name):
     _utils.rewrite_metadata(bundle_name, my_metadat)
 
 
-def serve(bundle_name, devflag_on: bool) -> None:
+def serve(bundle_name, **kwargs) -> None:
     # Print the bundle name for debugging purposes.
+    print('>in serve sub-command...')
     print('arg0:', bundle_name)
+    print('kwargs:', kwargs)
 
     # Build the expected directory and file path for the server script.
-    server_dir = os.path.join(bundle_name, 'servercode')
-    server_script_path = os.path.join(server_dir, 'run.py')
+    server_dir = bundle_name  # os.path.join(, 'servercode')
+    # server_script_path = os.path.join(server_dir, 'run.py')
+    server_script_path = os.path.join(server_dir, 'launch_game.py')
 
     if not os.path.isfile(server_script_path):
-        print(f'No server script found in bundle "{bundle_name}".')
-        print('It appears this game does not support multiplayer/server functionality.')
+        print(f'Cannot find "launch_game.py" found in the bundle "{bundle_name}".')
         return
 
-    print(f"Server script found at {server_script_path}. Launching server...")
-
-    if devflag_on:
-        print("Developer flag is ON. Running server in development mode.")
+    if kwargs['dev']:
+        print("The developer flag is ON... Need to run server in development mode.")
+        print('For now, this does NOTHING-- but may be useful later on')
 
     # Add the bundle directory to sys.path to allow package-relative imports.
     bundle_abs_path = os.path.abspath(bundle_name)
@@ -300,10 +307,16 @@ def serve(bundle_name, devflag_on: bool) -> None:
     mvars.mediator = mediator  # so the game can also use
     # .done
 
-    server_module = importlib.import_module("servercode.run")
-    # Optionally, if there's an entry function, call it.
-    # if hasattr(server_module, "main"):
-    server_module.main()
+    # try
+    launcher_module = importlib.import_module("launch_game")
+    print(f"Launching server...")
+    if not hasattr(launcher_module, 'server_execution'):
+        print('It appears this game does not support multiplayer/server functionality.')
+        return
+    # Forward all keyword arguments to the server_execution function.
+    if 'host' not in kwargs or 'port' not in kwargs:
+        raise ValueError('expecting at least host and port attributes to run a game server!')
+    launcher_module.server_execution(**kwargs)
 
     # >except Exception as e:
     # >   print(f"Error running the server script: {e}")

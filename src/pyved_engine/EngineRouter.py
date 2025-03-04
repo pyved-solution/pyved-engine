@@ -315,13 +315,17 @@ class EngineRouter:
     def surface_rotate(self, img, angle):
         return dep_linking.pygame.transform.rotate(img, _degrees(-1 * angle))
 
-    # - deprecated -----------------------------------
-    def run_game(self, initfunc, updatefunc, endfunc):
+    # - deprecated , but still used by launch_game.py -----------------------
+    def run_game(self, initfunc, updatefunc, endfunc, **kwargs):
+        print('----------------dans run_game--------------------------------')
+        print(kwargs)
+        print('.')
+
         # TODO this should be deleted
         #  as it wont work in Track- #1 + web
         experimental_webpy = __import__('sys').platform in ('emscripten', 'wasi')
         if not experimental_webpy:  # Track- #1 : the regular execution
-            initfunc(None)
+            initfunc(None, **kwargs)
             while not pe_vars.gameover:
                 # it's assumed that the developer calls pyv.flip, once per frame,
                 # without the engine having to take care of that

@@ -252,7 +252,7 @@ def _remove_junk_from_bundle_name(x):
 def main_inner(parser, argns):
     # definitions
     no_arg_subcommands = {'autogen'}
-    extra_flags_subcommands = {'share', 'play', 'serve'}  # mark all subcommands that use the 'dev' mode flag
+    extra_flags_subcommands = {'share'}  # mark all subcommands that use the 'dev' mode flag
 
     # the algorithm
     ope_name = argns.subcommand
@@ -274,17 +274,24 @@ def main_inner(parser, argns):
         # a few subcommands do not take an argument
         adhoc_subcommand_func()
 
+    elif ope_name in ('play', 'serve'):
+        # Convert args to a dictionary and remove keys that aren't intended as kwargs.
+        kwargs = {
+            k: v for k, v in vars(argns).items()
+            if k not in ["bundle_name", "command"] and v is not None
+        }
+        xarg = _remove_junk_from_bundle_name(argns.bundle_name)
+        adhoc_subcommand_func(xarg, **kwargs)
+
     elif ope_name == 'ts-creation':
         adhoc_subcommand_func(argns.image_path)
 
     else:
         xarg = _remove_junk_from_bundle_name(argns.bundle_name)
-        if ope_name not in extra_flags_subcommands:
-            adhoc_subcommand_func(xarg)
-        else:
-            # a few subcommands require the the dev mode flag!
+        if ope_name in extra_flags_subcommands:  # a few subcommands ask for 2 args, the second being devmode:bool
             adhoc_subcommand_func(xarg, argns.dev)
-
+        else:
+            adhoc_subcommand_func(xarg)
     return 0
 
     # handle ``pygmentize -L``
@@ -667,6 +674,10 @@ def do_parse_args():
     play_parser.add_argument(
         "bundle_name", type=str, nargs="?", default=".", help="Specified bundle (default: current folder)"
     )
+    # Define optional arguments that will be forwarded as kwargs.
+    play_parser.add_argument("--host", type=str, help="Server hostname")
+    play_parser.add_argument("--port", type=int, help="Server port")
+    play_parser.add_argument("--player", type=int, help="local player identifier")
 
     # ——————————————————————————————————
     # +++ AUTOGEN subcommand
@@ -702,12 +713,16 @@ def do_parse_args():
 
     # ——————————————————————————————————
     # +++ SERVE subcommand {
-    share_parser = subparsers.add_parser(
+    serve_parser = subparsers.add_parser(
         "serve", help="run the servercode, for a given game bundle"
     )
-    share_parser.add_argument(
+    serve_parser.add_argument(
         "bundle_name", type=str, nargs="?", default=".", help="Specified bundle (default: current folder)"
     )
+    # Define optional arguments that will be forwarded as kwargs.
+    serve_parser.add_argument("--host", type=str, help="Server hostname")
+    serve_parser.add_argument("--port", type=int, help="Server port")
+    serve_parser.add_argument("--player", type=int, help="local player identifier")
 
     # ——————————————————————————————————
     # +++ SHARE subcommand {
