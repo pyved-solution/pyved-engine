@@ -15,7 +15,7 @@ from pprint import pprint as _pprint
 
 import requests
 
-from . import bundle_ops
+from . import bundle_ops, cmdline_utils
 from . import cmdline_utils as _utils
 from . import opti_grab_bundle
 from . import server_ops as _netw, pyvcli_defs
@@ -139,11 +139,23 @@ def bump(bundle_name):
     """
     Nota Bene: operations bump, share automatically update the list of source files
     """
-    vx_with_dots = pyvcli_defs.read_ver()
-    print('bump bundle to current version, that is:', vx_with_dots)
+    active_engine_ver_wdots = pyvcli_defs.read_ver()
+    print('trying to bump to current version, that is', active_engine_ver_wdots)
+
     my_metadat = _utils.read_metadata(bundle_name)
-    my_metadat['dependencies']['pyved_engine'] = [vx_with_dots.replace('.', '_'), 'pyv']  # alias = pyv
-    _utils.rewrite_metadata(bundle_name, my_metadat)
+    if my_metadat['frozen']:
+        print('cannot bump a frozen game bundle, you will need to upgrade manually and with caution')
+    else:
+        good_idx = None
+        for k, elt in enumerate(my_metadat['dependencies']):
+            if elt[0] == 'pyved_engine':
+                good_idx = k
+                break
+        new_str = active_engine_ver_wdots.replace('.', '_')
+        my_metadat['dependencies'][good_idx][1] = new_str
+        my_metadat['build_date'] = cmdline_utils.gen_build_date_now()
+        # the alias that is the element of rank #2 probably stays the same, that is "pyv"
+        _utils.rewrite_metadata(bundle_name, my_metadat)
 
 
 def init(chosen_slug: str) -> None:
@@ -213,19 +225,19 @@ def init(chosen_slug: str) -> None:
     print('Go ahead and have fun ;)')
 
 
-def play(x, **kwargs):
+def play(bundle_name, **kwargs):
     devflag_on = kwargs['dev']
     print('dans la cmd', kwargs)
-    if '.' != x and os.path.isdir('cartridge'):
+    if '.' != bundle_name and os.path.isdir('cartridge'):
         raise ValueError('launching with a "cartridge" in the current folder, but no parameter "." is forbidden')
 
     # ------------------------
     #  just checking for errors, on metadat.json
     # ------------------------
-    mdata_path = os.path.join(x, 'cartridge', 'metadat.json')
+    mdata_path = os.path.join(bundle_name, 'metadat.json')
     try:
         with open(mdata_path, 'r') as fptr:
-            print(f"game bundle {x} found. Reading metadata...")
+            print(f"game bundle {bundle_name} found. Reading metadata...")
             metadata = json.load(fptr)
         # - debug
         # print('Metadata:\n', metadata)
@@ -235,19 +247,21 @@ def play(x, **kwargs):
         if metadata['ktg_services']:
             _netw.do_login_via_terminal(metadata, not devflag_on)
         sys.path.append(os.getcwd())
-        if x == '.':
-            vmsl = importlib.import_module(bundle_ops.RUNGAME_SCRIPT_NAME, None)
-        else:
-            vmsl = importlib.import_module('.' + bundle_ops.RUNGAME_SCRIPT_NAME, x)
+        #if x == '.':
+        #    vmsl = importlib.import_module(bundle_ops.RUNGAME_SCRIPT_NAME, None)
+        #else:
+        from . import game_launcher as vmsl
+        # vmsl = importlib.import_module('.' + bundle_ops.RUNGAME_SCRIPT_NAME, x)
+
+        # At this point:
+        # assuming that metadata is available, and error-free... We can run boot_game
+        vmsl.boot_game(mdata_path, **kwargs)
 
     except FileNotFoundError:
-        print(f'Error: cannot find the game bundle you specified: {x}')
+        print(f'Error: cannot find the game bundle you specified: {bundle_name}')
         print('  Are you sure it exists in the current folder? Alternatively you can try to')
         print('  change directory (cd) and simply type `pyv-cli play`')
         print('  once you are inside the bundle')
-
-    # At this point: can assume metadata is available and error-free...
-    vmsl.boot_game(mdata_path, **kwargs)
 
 
 def refresh(bundle_name):
@@ -370,7 +384,10 @@ def share(bundle_name, dev_flag_on):
 def test(bundle_name):
     print(f"Folder targetted to inspect game bundle: {bundle_name}")
     metadat = _utils.read_metadata(bundle_name)
-    err_message = _utils.verify_metadata(metadat)
+
+    print('hot bundle') if not metadat['frozen'] else print('bundle:frozen<<<')
+
+    err_message = _utils.verif_mdata_hot_bundle(metadat)
     if err_message is not None:
         raise ValueError(f'The metadata file has an invalid format! ({err_message})')
 

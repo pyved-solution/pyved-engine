@@ -1,0 +1,74 @@
+{
+    "dependencies": {
+        "type": "list",
+        "items_type": "list"
+    },
+    "asset_base_folder": {
+        "type": "str"
+    },
+    "asset_list": {
+        "type": "list",
+        "items_type": "str"
+    },
+    "sound_base_folder": {
+        "type": "str"
+    },
+    "sound_list": {
+        "type": "list",
+        "items_type": "str"
+    },
+    "frozen": {
+        "type": "bool"
+    },
+    "data_files": {
+        "type": "list",
+        "items_type": "str"
+    },
+    "vmlib_ver": {
+        "type": "str"
+    },
+    "author": {
+        "type": "str"
+    },
+    "build_date": {
+        "type": "str"
+    },
+    "description": {
+        "type": "str"
+    },
+    "title": {
+        "type": "str"
+    },
+    "instructions": {
+        "type": "str"
+    },
+    "slug": {
+        "type": "str"
+    },
+    "thumbnail512x384": {
+        "type": "str"
+    },
+    "thumbnail512x512": {
+        "type": "str"
+    },
+    "ktg_services": {
+        "type": "bool"
+    },
+    "source_files": {
+        "type": "list",
+        "items_type": "str"
+    },
+    "uses_challenge": {
+        "type": "bool"
+    },
+    "has_game_server": {
+        "type": "bool"
+    },
+    "ncr_faucet": {
+        "type": "bool"
+    },
+    "game_genre": {
+        "type": "list",
+        "items_type": "str"
+    }
+}

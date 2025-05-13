@@ -8,40 +8,9 @@ from . import bundle_ops
 from . import server_ops as _netw
 
 
-EXP_METADAT_KEYS = (
-    'dependencies',
-    'asset_base_folder',
-    'asset_list',
-    'sound_base_folder',
-    'sound_list',
-    "data_files",  # for levels/maps, etc.
-
-    'vmlib_ver',
-    'author',
-    'build_date',
-    'dependencies',
-    'description',
-    'title',
-    'instructions',
-    'slug',
-    'thumbnail512x384',
-    'thumbnail512x512',
-    'ktg_services',
-    'source_files',
-
-    'uses_challenge',
-    'has_game_server',
-    'ncr_faucet',
-    'game_genre'
-)
-
-
 class MetadatEntries:
-    """
-    what you find below should match what has been written above,
-    this is used to avoid harmful typos when implementing pyv-cli subcommands...
-    and also to set default values in a clean way
-    """
+    # what you find below should match what is written in the spare_parts/metadat_format.json,
+    # and this is useful to avoid harmful typos when implementing various pyv-cli subcommands
     GameTitle = 'title'
     Slug = 'slug'
     Genre = 'game_genre'
@@ -49,7 +18,7 @@ class MetadatEntries:
     Date = 'build_date'
     Libs = 'dependencies'
 
-    # default values
+    # define our default values...
     DefaultAuthor = 'Unknown'
 
 
@@ -104,32 +73,77 @@ def recursive_copy(source_folder, destination_folder):
 
 def test_isfile_in_cartridge(filename, bundle_name) -> bool:
     wrapper_folder = fpath_join(os.getcwd(), bundle_name)
-    cartridge_folder = fpath_join(wrapper_folder, 'cartridge')
-    targ = os.path.sep.join((cartridge_folder, filename))
+    # TODO support for frozen bundles needs to be added here
+    # cartridge_folder = fpath_join(wrapper_folder, 'cartridge')
+    adhoc_folder = wrapper_folder
+    targ = os.path.sep.join((adhoc_folder, filename))
     return os.path.isfile(targ)
 
 
-def verify_metadata(mdat_obj) -> str:
-    """
-    confirm that the metadata contains all required fields
-    returns a str if something is missing!
-    """
-    global EXP_METADAT_KEYS
-    for k in EXP_METADAT_KEYS:
-        if k not in mdat_obj:
-            return 'Missing key= {}'.format(k)
-    # need to test that pyved_engine is in dependencies...
-    if "pyved_engine" not in mdat_obj['dependencies']:
-        return 'Invalid list detected: "pyved_engine" not listed in the list of dependencies'
+# Load the metadata format definition
+def load_metadata_format(file_path: str):
+    with open(file_path, 'r') as f:
+        return json.load(f)
 
-    # we also need to test whether Y or N, categories specified are still recognized within the CMS!
+
+# Function to check if a value matches the expected type
+def check_type(value, expected_type):
+    if expected_type == "str" and isinstance(value, str):
+        return True
+    elif expected_type == "bool" and isinstance(value, bool):
+        return True
+    elif expected_type == "list" and isinstance(value, list):
+        return True
+    return False
+
+
+def verif_mdata_hot_bundle(mdat_obj) -> str:
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    mtd_format = load_metadata_format(fpath_join(script_dir, 'spare_parts', 'metadat_format.json'))
+    return verify_metadata(mdat_obj, mtd_format)
+
+
+def verify_metadata(mdat_obj, given_metadata_format) -> str:
+    """
+    Confirm that the metadata contains all required fields and follows the specified format.
+    Returns a string if something is missing or invalid.
+    """
+    for key, field_info in given_metadata_format.items():
+        # Check for the existence of required keys (all keys are required)
+        if key not in mdat_obj:
+            return f'Missing key: {key}'
+
+        # Check for type correctness
+        value = mdat_obj[key]
+        expected_type = field_info["type"]
+        if not check_type(value, expected_type):
+            return f'Invalid type for key: {key}. Expected {expected_type}, got {type(value).__name__}'
+
+        # If it’s a list, check if the items type is correct
+        if expected_type == "list" and "items_type" in field_info:
+            items_type = field_info["items_type"]
+            if not all(check_type(item, items_type) for item in value):
+                return f'Invalid list items for key: {key}. Expected {items_type}'
+
+    # Specific checks for some fields
+    pyved_found = False
+    for elt in mdat_obj['dependencies']:
+        if elt[0] == "pyved_engine":
+            pyved_found = True
+            break
+    if not pyved_found:
+        return 'Abnormal dependencies list detected: "pyved_engine" isnt listed'
+
+    # We also need to test whether Y or N, categories specified are valid
+    # from a cloud storage perspective!
     if (not isinstance(mdat_obj['game_genre'], list)) or (len(mdat_obj['game_genre']) == 0):
         return 'Invalid metadat format: value tied to "game_genre" has to be a list with non-zero length'
     ok_game_genres = _netw.fetch_remote_game_genres()
     for elt in mdat_obj['game_genre']:
         if elt not in ok_game_genres:
             return f'Game genre "{elt}" rejected by the Kata.Games system, please contact an Admin, or replace value'
-    print('Metadata->OK')
+
+    print('Metadata looks fine *** OK')
 
 
 def read_metadata(bundle_name, specific_dir=None):
@@ -141,14 +155,17 @@ def read_metadata(bundle_name, specific_dir=None):
         print('reading metadat...')
         print('looking in:', wrapper_bundle)
 
-    if not os.path.exists(wrapper_bundle):
-        raise FileNotFoundError(f'ERR! Cant find the specified game bundle ({bundle_name})')
     cartridge_folder = os.path.join(wrapper_bundle, 'cartridge')
-    if not os.path.exists(cartridge_folder):
-        raise ValueError('ERR! Bundle format isnt valid, cartridge structure is missing')
+    if os.path.exists(cartridge_folder):
+        adhoc_folder = cartridge_folder
+        # raise ValueError('ERR! Bundle format isnt valid, cartridge structure is missing')
+    elif os.path.exists(wrapper_bundle):
+        adhoc_folder = wrapper_bundle
+    else:
+        raise FileNotFoundError(f'ERR! Cannot find metadat in the game bundle ({bundle_name})')
 
     # need to open cartridge, read metadata,
-    whats_open = os.path.sep.join((cartridge_folder, 'metadat.json'))
+    whats_open = os.path.sep.join((adhoc_folder, 'metadat.json'))
     # print('READING', whats_open, '...')
     f_ptr = open(whats_open, 'r')
     obj = json.load(f_ptr)
@@ -162,7 +179,7 @@ def rewrite_metadata(bundle_name, blob_obj, specific_dir=None):
     else:
         tdir = specific_dir
     wrapper_bundle = os.path.join(tdir, bundle_name)
-    cartridge_folder = os.path.join(wrapper_bundle, 'cartridge')
+    cartridge_folder = wrapper_bundle  #os.path.join(wrapper_bundle, 'cartridge')
     what_to_open = os.path.sep.join((cartridge_folder, 'metadat.json'))
     print(f'REWRITING file {what_to_open}...')
     with open(what_to_open, 'w') as fptr:
