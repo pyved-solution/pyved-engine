@@ -55,6 +55,13 @@ class GameTpl(metaclass=ABCMeta):
         if gs_enum is not None:
             self.engine.declare_game_states(gs_enum, mapping, self)
 
+        # this exists because using GameTpl class is >deprecated<
+        # one should rather use the launch_game.py script +3 basic functions in your gamedef that are:init,update,close
+        self.engine.preload_assets(
+            {'asset_list': [], 'sound_list': [], 'data_files': []},
+            prefix_asset_folder='assets/', prefix_sound_folder='./'
+        )
+
     def update(self, infot):
         pk = self.engine.get_pressed()
         self._manager.post(EngineEvTypes.Update, curr_t=infot)

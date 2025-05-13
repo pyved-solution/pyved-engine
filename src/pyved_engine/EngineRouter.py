@@ -96,7 +96,7 @@ class EngineRouter:
         # late bind
         self._hub.update({
             'images': self._storage.images,
-            'data': self._storage.data,
+            #'data': self._storage.data,
             'sounds': self._storage.sounds,
             'spritesheets': self._storage.spritesheets,
             'csvdata': self._storage.csvdata
@@ -299,15 +299,8 @@ class EngineRouter:
         return self.low_level_service.new_rect_obj(*args)
 
     def close_game(self):
+        self._storage.flush_mem()
         self.low_level_service.quit()
-
-        # pe_vars.gameover = False
-        # dep_linking.pygame.mixer.quit()
-        # dep_linking.pygame.quit()
-        self.images.clear()
-        self.csvdata.clear()
-        self.sounds.clear()
-        self.spritesheets.clear()
 
     def surface_create(self, size):
         return self.low_level_service.new_surface_obj(size)

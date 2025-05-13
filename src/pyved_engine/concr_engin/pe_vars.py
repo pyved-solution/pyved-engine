@@ -26,7 +26,13 @@ import re
 # one that is displayed in a user-defined size canvas and also uses a pixel-to-pixel mapping just like the 'hd' option
 # from pyved_engine.custom_struct import Objectifier
 
-STD_SCR_SIZE = (960, 720)
+# below is a read-only value,
+# to retrieve this value from outside you can call pyv.get_version()
+ENGINE_VERSION_STR = '25.4a1'
+
+# TODO ensure all errors have been removed,
+#  as this is deprecated
+# STD_SCR_SIZE = (960, 720)
 
 # USEREVENT = 32850  # pygame userevent 2.1.1
 # FIRST_ENGIN_TYPE = USEREVENT + 1
@@ -193,10 +199,6 @@ class KengiEv:
         self.fields = entries
         self.__dict__.update(entries)
 
-
-# below is a read-only value,
-# to retrieve this value from outside you can call pyv.get_version()
-ENGINE_VERSION_STR = '25.3a1'
 
 DATA_FT_SIZE = 16
 

@@ -1,33 +1,26 @@
 """
-+----------------------------------------------------+
-| Pyv - a pythonic 2d Game Engine                    |
-| Our motto ~ Never slow down the innovation         |
-|                                                    |
-| https://github.com/gaudiatech/pyved-engine         |
-| an open-source project started by GAUDIA TECH INC. |
-|                                                    |
-| Main author is: Thomas I. EDER / moonbak           |
-| (github.com/wkta) - Contact thomas@katagames.io    |
-+----------------------------------------------------+
+| A pythonic 2d Game Engine
+| Our motto ~ Never slow down the innovation
+| https://github.com/pyved-solution/pyved-engine
+| an open-source project initiated by GAUDIA TECH INC.
+
+Main contributor: Thomas I. EDER / moonbak
+Contact: thomas@katagames.io
 """
-# from . import _hub
-from .EngineRouter import EngineRouter
-# from .Singleton import Singleton
-# from ._classes import *
-# from .compo import gfx
-# from .compo import vscreen  # deprecated
-from .compo.GameTpl import GameTpl  # legacy cls
-# from .foundation import legacy_evs  # we just copy the event system of pygame
-from .abstraction.EvSystem import Emitter, EvListener, EngineEvTypes
-from .concr_engin import pe_vars as defs
 from . import hub
+from .EngineRouter import EngineRouter
+from .abstraction.EvSystem import Emitter, EvListener, EngineEvTypes
+from .compo.GameTpl import GameTpl  # legacy class
+from .concr_engin import pe_vars as defs
 
-
-# TODO remove this when we can
-# ive kept it for retro-compatibility with projects that target pyv v23.6a1
-# such as demos/ecs_naif or the very early stage pyved ships-with-GUI editor
-# from .utils._ecs_pattern import entity, component, System, SystemManager, EntityManager
+# you can activate the lines below
 # from . import evsys0
+# from .utils._ecs_pattern import entity, component, System, SystemManager, EntityManager
+
+# ...In case you need a stronger retro-compatibility with projects targeting pyv v23.6a1
+# such as:
+# - demos/ecs_naif, or
+# - ships-with-GUI editor
 
 
 _stored_kbackend = None

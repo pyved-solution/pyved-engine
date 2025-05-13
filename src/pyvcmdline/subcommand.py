@@ -20,8 +20,7 @@ from . import cmdline_utils as _utils
 from . import opti_grab_bundle
 from . import server_ops as _netw, pyvcli_defs
 from . import tileset_creator as _ts_creator
-from .cmdline_utils import read_metadata, rewrite_metadata, MetadatEntries, \
-    test_isfile_in_cartridge
+from .cmdline_utils import read_metadata, rewrite_metadata, MetadatEntries, test_isfile_in_cartridge
 
 
 # -------------------------
@@ -104,10 +103,10 @@ def _query_slug_availability(x):
     try:
         # error handling after ping the VMstorage remote service
         if slug_avail_serv_truth.status_code != 200:
-            raise Exception('[netw error] cannot reach the VMstorage service! Contact developers to report that bug please')
+            raise Exception('[netw error] cant reach the VMstorage service! Contact devs to report the bug, please')
         obj_serv_truth = slug_avail_serv_truth.json()
         if ('success' not in obj_serv_truth) or not obj_serv_truth['success']:
-            raise Exception('[protocol error] unexpected result after communication with VMstorage service. Contact devs')
+            raise Exception('[protocol error] unexpected result after comms with VMstorage service. Contact devs')
     except json.decoder.JSONDecodeError:
         print('Error! Cant decode reply from server...')
         print('url=', good_url)
@@ -297,14 +296,16 @@ def serve(bundle_name, **kwargs) -> None:
     mvars = importlib.import_module("servercode.glvars")
     from pyved_engine.EngineRouter import EngineRouter
     from pyved_engine.abstraction.PygameWrapper import PygameWrapper
-    mvars.pyv = pyv = EngineRouter(PygameWrapper())
+    mvars.pyv = EngineRouter(PygameWrapper())
     mvars.pyv.bootstrap_e()
-    # TODO should bind a mediator
-    netw_layer = pyv.neotech.Objectifier(**pyv.neotech.build_net_layer('socket', 'server'))
-    mediator = pyv.neotech.UMediator()
-    mediator.set_network_layer(netw_layer)
 
-    mvars.mediator = mediator  # so the game can also use
+    # --- the custom code in launch_game.py>>server_execution handles this part
+    # PART=should bind a mediator
+
+    # netw_layer = pyv.neotech.Objectifier(**pyv.neotech.build_net_layer('socket', 'server'))
+    # mediator = pyv.neotech.UMediator()
+    # mediator.set_network_layer(netw_layer)
+    # mvars.mediator = mediator  # so the game can also use
     # .done
 
     # try

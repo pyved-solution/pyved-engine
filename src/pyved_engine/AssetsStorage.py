@@ -28,6 +28,13 @@ class AssetsStorage:
                     map_data.append(list(map(int, row)))
             self.csvdata[filename_no_ext] = map_data
 
+    def flush_mem(self):
+        self.images.clear()
+        self.csvdata.clear()
+        self.sounds.clear()
+        self.fonts.clear()
+        self.spritesheets.clear()
+
     def __init__(self, lowlevel_service, gfx, adhoc_dict: dict, prefix_asset_folder, prefix_sound_folder, debug_mode=False, webhack=None):
         """
         expected to find the (mandatory) key 'images',
@@ -36,11 +43,10 @@ class AssetsStorage:
         self.gfx = gfx
 
         self.images = dict()
-        self.data = dict()
+        # self.data = dict()
         self.sounds = dict()
         self.fonts = dict()
         self.spritesheets = dict()
-
         self.csvdata = dict()  # add-on
 
         if debug_mode:
