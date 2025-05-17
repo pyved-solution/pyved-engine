@@ -204,7 +204,7 @@ class EngineRouter:
         from .looparts import rogue
         from .import umediator
         self._hub.update({
-            'neotech': umediator,
+            'umediator': umediator,
             'ecs': ecs,
             'rogue': rogue,
             'states': state_management,
@@ -249,11 +249,12 @@ class EngineRouter:
         pe_vars.gameover = bval
         print('[EngineRouter]->direct signal of game termination received')
 
-    # can be used to replace the default mediator [hack for .neotech]
-    def use_mediator(self, ref_m):
-        pe_vars.mediator = ref_m
+    # [a hack for using pyv.umediator]
+    # this is handy to replace the default mediator by the modern/more powerful one
+    def use_mediator(self, ref_evomed):
         self.bypass_event_type_checking = True
-        print('  >>using experimental Umediator Obj<<')
+        pe_vars.mediator = ref_evomed
+        print('>>PYVED: Now using the experimental Umediator Obj<<')
 
     def post_ev(self, evtype, **ev_raw_data):
         if self.debug_mode:

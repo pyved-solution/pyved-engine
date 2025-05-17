@@ -23,6 +23,11 @@ from . import tileset_creator as _ts_creator
 from .cmdline_utils import read_metadata, rewrite_metadata, MetadatEntries, test_isfile_in_cartridge
 
 
+MODULE_WITH_SERV_CODE = 'netcode'  # module you should put inside the game bundle
+SCRIPT_WITH_SERV_CODE = 'run_server.py'
+SERV_CODE_START_FUNC = 'exec'
+
+
 # -------------------------
 #  private func
 # -------------------------
@@ -283,58 +288,49 @@ def serve(bundle_name, **kwargs) -> None:
     print('>in serve sub-command...')
     print('arg0:', bundle_name)
     print('kwargs:', kwargs)
-
     # Build the expected directory and file path for the server script.
-    server_dir = bundle_name  # os.path.join(, 'servercode')
-    # server_script_path = os.path.join(server_dir, 'run.py')
-    server_script_path = os.path.join(server_dir, 'launch_game.py')
+    server_dir = os.path.join(bundle_name, MODULE_WITH_SERV_CODE)
+    server_script_path = os.path.join(server_dir, SCRIPT_WITH_SERV_CODE)
 
-    if not os.path.isfile(server_script_path):
-        print(f'Cannot find "launch_game.py" found in the bundle "{bundle_name}".')
-        return
+    print('pyved is looking for:', server_script_path)
+    if os.path.isfile(server_script_path):
+        if kwargs['dev']:
+            print("The developer flag is ON... Need to run server in development mode.")
+            print('For now, this does NOTHING-- but may be useful later on')
+        # Add the bundle directory to sys.path to allow package-relative imports.
+        bundle_abs_path = os.path.abspath(bundle_name)
+        if bundle_abs_path not in sys.path:
+            sys.path.insert(0, bundle_abs_path)
 
-    if kwargs['dev']:
-        print("The developer flag is ON... Need to run server in development mode.")
-        print('For now, this does NOTHING-- but may be useful later on')
+        # TODO achiev this in web context aint that easy. How to overcome the challenge?
+        # ---start
 
-    # Add the bundle directory to sys.path to allow package-relative imports.
-    bundle_abs_path = os.path.abspath(bundle_name)
-    if bundle_abs_path not in sys.path:
-        sys.path.insert(0, bundle_abs_path)
+        # we 'll need to bind pyv to the 'wrapped' shared vars file
+        serv_glvars_module_desc = '.'.join((MODULE_WITH_SERV_CODE, 'shared_code', 'glvars'))
+        mvars = importlib.import_module(serv_glvars_module_desc)
+        from pyved_engine.EngineRouter import EngineRouter
+        from pyved_engine.abstraction.PygameWrapper import PygameWrapper
+        mvars.pyv = EngineRouter(PygameWrapper())  # dependency injection
+        mvars.pyv.bootstrap_e()
+        module_basename, ext = os.path.splitext(SCRIPT_WITH_SERV_CODE)
+        file_to_start_server = '.'.join((MODULE_WITH_SERV_CODE, module_basename))
 
-    # >try:
-    # Import the server module as part of the servercode package.
+        print(f"using the server launcher {file_to_start_server}")
+        launcher_module = importlib.import_module(file_to_start_server)
+        if hasattr(launcher_module, SERV_CODE_START_FUNC):
+            if 'host' in kwargs and 'port' in kwargs:
+                getattr(launcher_module, SERV_CODE_START_FUNC)(**kwargs)  # forwardin kwargs to the server starter func
+            else:
+                raise ValueError('Error: you need to specify at least "host" and "port" to run a game server!')
+        else:
+            # error handling at level 2
+            print(f"Error: it appears the game doesn't support multiplayer properly \
+             (no {SERV_CODE_START_FUNC} function to be found in {SCRIPT_WITH_SERV_CODE}).")
+        # ---end
 
-    # TODO how to achiev this in web context?
-    # dep injection , the old-school way
-    mvars = importlib.import_module("servercode.glvars")
-    from pyved_engine.EngineRouter import EngineRouter
-    from pyved_engine.abstraction.PygameWrapper import PygameWrapper
-    mvars.pyv = EngineRouter(PygameWrapper())
-    mvars.pyv.bootstrap_e()
-
-    # --- the custom code in launch_game.py>>server_execution handles this part
-    # PART=should bind a mediator
-
-    # netw_layer = pyv.neotech.Objectifier(**pyv.neotech.build_net_layer('socket', 'server'))
-    # mediator = pyv.neotech.UMediator()
-    # mediator.set_network_layer(netw_layer)
-    # mvars.mediator = mediator  # so the game can also use
-    # .done
-
-    # try
-    launcher_module = importlib.import_module("launch_game")
-    print(f"Launching server...")
-    if not hasattr(launcher_module, 'server_execution'):
-        print('It appears this game does not support multiplayer/server functionality.')
-        return
-    # Forward all keyword arguments to the server_execution function.
-    if 'host' not in kwargs or 'port' not in kwargs:
-        raise ValueError('expecting at least host and port attributes to run a game server!')
-    launcher_module.server_execution(**kwargs)
-
-    # >except Exception as e:
-    # >   print(f"Error running the server script: {e}")
+    else:
+        # error handling at level 1
+        print(f"Error: no {SCRIPT_WITH_SERV_CODE} to be found in the bundle. Are you sure it's a multiplayer game?")
 
 
 def share(bundle_name, dev_flag_on):
