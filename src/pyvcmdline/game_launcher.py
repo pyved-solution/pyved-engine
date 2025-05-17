@@ -3,30 +3,36 @@ import json
 import os
 
 
-bundle_name, link_to_glvars, pyved_engine_alias = None, None, 'pyved_engine'
+bundle_name, game_glvars, pyved_engine_alias = None, None, 'pyved_engine'
 
 
 # boot_game func relies on that implementation
 def prep_libs(cb_func, rel_import_flag, plugins_list):
+    # deprecated: rel_import_flag always False since May2025
+
     global pyved_engine_alias
-    for alias, plugin_name in plugins_list:
-        if plugin_name == 'pyved_engine':
+    for mlib_chosen_alias, micro_lib_name in plugins_list:
+        if micro_lib_name == 'pyved_engine':
             import pyved_engine
             plugin_module = pyved_engine.get_engine_router()
-            pyved_engine_alias = alias
+            pyved_engine_alias = mlib_chosen_alias
             getattr(pyved_engine, 'hub').bundle_name = bundle_name
-        elif rel_import_flag:
-            module_name = f".lib.{plugin_name}"
-            plugin_module = importlib.import_module(module_name, __package__)
+
+        # elif rel_import_flag:
+        #    module_name = f".lib.{plugin_name}"
+        #    plugin_module = importlib.import_module(module_name, __package__)
         else:
-            module_name = f"lib.{plugin_name}"
+            module_name = f"{bundle_name}.micro_libs.{micro_lib_name}"
+            print('--->game launcher will import micro lib:', module_name)
             plugin_module = importlib.import_module(module_name)
-        cb_func(alias, plugin_name, plugin_module)
+
+        print(f" * calling inner_glvars register on:{micro_lib_name}->{mlib_chosen_alias}")
+        cb_func(mlib_chosen_alias, micro_lib_name, plugin_module)
 
 
 # boot_game func relies on that implementation
 def game_execution(metadata, gdef_module, **kwargs):
-    global link_to_glvars, pyved_engine_alias
+    global game_glvars, pyved_engine_alias
 
     def find_folder(givenfolder, start_path):
         for root, dirs, files in os.walk(start_path):
@@ -42,7 +48,7 @@ def game_execution(metadata, gdef_module, **kwargs):
     # else:
     #     raise FileNotFoundError("ERR: Asset dir for pre-loading assets cannot be found!")
 
-    pyv = getattr(link_to_glvars, pyved_engine_alias)
+    pyv = getattr(game_glvars, pyved_engine_alias)
 
     pyv.bootstrap_e()
     pyv.preload_assets(
@@ -63,7 +69,7 @@ import sys
 def boot_game(mdata_path, **kwargs):
     print('------mdata_path=', mdata_path)
 
-    global bundle_name, link_to_glvars
+    global bundle_name, game_glvars
 
     cwd = os.getcwd()
     # Ensure that the current working directory is in sys.path
@@ -72,17 +78,11 @@ def boot_game(mdata_path, **kwargs):
 
     with open(mdata_path, 'r') as fp:
         metadata = json.load(fp)
-        #try:
-        #    from cartridge import glvars as c_glvars
-        rel_imports = False
-        #except ModuleNotFoundError:
-        #    from .cartridge import glvars as c_glvars
-        #    rel_imports = True
         pck_name = os.path.basename(os.path.dirname(mdata_path))
         module_name = f"{pck_name}.glvars"
-        c_glvars = importlib.import_module(module_name)
+        game_glvars = inner_glvars = importlib.import_module(module_name)
 
-        link_to_glvars = c_glvars  # glvars becomes available elsewhere
+        # TODO nothing to do with the version number??
         lib_list = list()
         for elt in metadata['dependencies']:
             lib_id = elt[0]
@@ -92,9 +92,14 @@ def boot_game(mdata_path, **kwargs):
             else:
                 lib_list.append((lib_id, lib_id))
         bundle_name = metadata['slug']
-        prep_libs(c_glvars.register_lib, rel_imports, lib_list)
-        if c_glvars.has_registered('network'):  # manually fix the network lib (retro-compat)
-            getattr(c_glvars, c_glvars.get_alias('network')).slugname = metadata['slug']
+
+        # ----
+        # prepare libraries
+        # ----
+        prep_libs(inner_glvars.register_lib, False, lib_list)
+        # we HAVE TO manually fix the network microlib (retro-compatibility)
+        if inner_glvars.has_registered('network'):
+            getattr(inner_glvars, inner_glvars.get_alias('network')).slugname = metadata['slug']
 
         # if not rel_imports:
         #     from cartridge import gamedef

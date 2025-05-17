@@ -317,24 +317,32 @@ class EngineRouter:
         # TODO this should be deleted
         #  as it wont work in Track- #1 + web
         experimental_webpy = __import__('sys').platform in ('emscripten', 'wasi')
-        if not experimental_webpy:  # Track- #1 : the regular execution
+
+        if not experimental_webpy:  # the regular execution
+            print('run_game >>> kwargs:', kwargs)
+            # initfunc(None)  # if we remove kwargs, we cant launch a game client with parameters such as host=...
             initfunc(None, **kwargs)
+
             while not pe_vars.gameover:
                 # it's assumed that the developer calls pyv.flip, once per frame,
                 # without the engine having to take care of that
                 updatefunc(time.time())
             endfunc(None)
-        else:  # experimental part: for wasm, etc
-            import asyncio
-            async def async_run_game():
-                initfunc(None)
-                while not pe_vars.gameover:
-                    updatefunc(time.time())
-                    self.flip()  # commit gfx mem to screen, already contains the .tick
-                    await asyncio.sleep(0)
-                endfunc(None)
+        else:
+            raise NotImplementedError
 
-            asyncio.run(async_run_game())
+        # added by another contributor (not tom)
+
+        # else:  # experimental part: for wasm, etc
+        #     import asyncio
+        #     async def async_run_game():
+        #         initfunc(None)
+        #         while not pe_vars.gameover:
+        #             updatefunc(time.time())
+        #             self.flip()  # commit gfx mem to screen, already contains the .tick
+        #             await asyncio.sleep(0)
+        #         endfunc(None)
+        #     asyncio.run(async_run_game())
 
     # --- trick to use either the hub or the sublayer
     def __getattr__(self, item):
