@@ -2,7 +2,15 @@ import json
 import threading
 import time
 
-import websocket
+
+import websocket  # pip install websocket-client
+"""
+What's different between websocket (client) and websockets (async):
+websocket-client: This library provides a synchronous interface to handle WebSocket connections,
+hich is what we are using in the curent script.
+
+websockets: This library is designed to work with asyncio and is typically used for asynchronous WebSocket handling.
+"""
 
 
 __all__ = [
@@ -11,7 +19,6 @@ __all__ = [
     'broadcast',
     'register_mediator'
 ]
-
 mediators = list()
 # inbound_connections = list()
 ref_threads = list()

@@ -674,10 +674,12 @@ def do_parse_args():
     play_parser.add_argument(
         "bundle_name", type=str, nargs="?", default=".", help="Specified bundle (default: current folder)"
     )
-    # Define optional arguments that will be forwarded as kwargs.
+    # Can use these optional arguments, to make multiplayer functional
+    # all these datas will be forwarded as kwargs, if they are specified thru the command-line
     play_parser.add_argument("--host", type=str, help="Server hostname")
     play_parser.add_argument("--port", type=int, help="Server port")
     play_parser.add_argument("--player", type=int, help="local player identifier")
+    play_parser.add_argument("--mode", type=str, help="what type of transport layer to use (ws/socket/etc)")
 
     # ——————————————————————————————————
     # +++ AUTOGEN subcommand
@@ -717,12 +719,13 @@ def do_parse_args():
         "serve", help="run the servercode, for a given game bundle"
     )
     serve_parser.add_argument(
-        "bundle_name", type=str, nargs="?", default=".", help="Specified bundle (default: current folder)"
+        "bundle_name", type=str, help="Specified bundle (default: current folder)"
     )
     # Define optional arguments that will be forwarded as kwargs.
     serve_parser.add_argument("--host", type=str, help="Server hostname")
     serve_parser.add_argument("--port", type=int, help="Server port")
     serve_parser.add_argument("--player", type=int, help="local player identifier")
+    serve_parser.add_argument("--mode", type=str, help="what type of transport layer to use (ws/socket/etc)")
 
     # ——————————————————————————————————
     # +++ SHARE subcommand {
