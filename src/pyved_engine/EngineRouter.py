@@ -65,6 +65,8 @@ class EngineRouter:
 
         core.set_sublayer(sublayer_compo)
         core.save_engine_ref(self)
+
+        self.server_flag=False
         self.low_level_service = sublayer_compo
 
         self.assets_loaded = False
@@ -239,8 +241,9 @@ class EngineRouter:
         print('Hub in EngineRouter has been updated')
 
         self.keycodes = CodesProxy(self.low_level_service)
-        # we always enable sounds, so the engine is ready to load datas
-        self.low_level_service.init_sound()
+        if not self.server_flag:
+            # we always enable sounds, so the engine is ready to load datas
+            self.low_level_service.init_sound()
 
     def process_evq(self):
         pe_vars.mediator.update()
