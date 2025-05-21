@@ -1,129 +1,90 @@
 import json
 import threading
-import time
+import websocket
 
-
-import websocket  # pip install websocket-client
-"""
-What's different between websocket (client) and websockets (async):
-websocket-client: This library provides a synchronous interface to handle WebSocket connections,
-hich is what we are using in the curent script.
-
-websockets: This library is designed to work with asyncio and is typically used for asynchronous WebSocket handling.
-"""
-
-
-__all__ = [
-    'get_server_flag',
-    'start_comms',
-    'broadcast',
-    'register_mediator'
-]
-mediators = list()
-# inbound_connections = list()
-ref_threads = list()
-
-# old?
+# Global reference to the WebSocket
 ref_ws = None
-_receiver_thread = None
+mediators = []
 
-# ----------- private stuff --------------
+# Callback when a message is received
 def ws_on_message(ws, message):
     global mediators
-    serial = message
-    print(f'Received shared variable update: {serial}')
-    evtype, content = serial.split('#')
-
-    print('ws on message [[[[ ', evtype)
-    print('ws on message <Content> ', content)
-    k = len(mediators)
-    print(f'passed to {k} mediators')
-    for m in mediators:
-        m.post(evtype, content, False)
-
+    print(f"Received shared variable update: {message}")
+    try:
+        evtype, raw_content = message.split('#', 1)
+        content = json.loads(raw_content)
+        print(f"Event: {evtype}, Content: {content}")
+        # Pass message to mediators
+        for m in mediators:
+            m.post(evtype, content, False)
+    except Exception as e:
+        print(f"Error processing message: {e}")
 
 def ws_on_error(ws, error):
     print(f"WebSocket error: {error}")
-
 
 def ws_on_close(ws, close_status_code, close_msg):
     print("WebSocket connection closed")
 
 
-def ws_on_open(ws_handle):
+# def ws_on_open(ws):
+#     global ref_ws
+#     ref_ws = ws
+#     print("WebSocket connection opened")
+
+# Event to block the main thread until WebSocket is connected
+ws_connected_event = threading.Event()
+
+def ws_on_open(ws):
     global ref_ws
-    ref_ws = ws_handle
+    ref_ws = ws
     print("WebSocket connection opened")
+    # Signal that the WebSocket connection is established
+    ws_connected_event.set()
 
 
-def _receive_updates(host_info, port_info):
-    global ref_ws
-    websocket.enableTrace(True)
-    websocket.WebSocketApp(
-        f'ws://{host_info}:{port_info}/',
-        on_open=ws_on_open, on_message=ws_on_message, on_error=ws_on_error,
-        on_close=ws_on_close
-    ).run_forever()
-
-
-def get_server_flag():
-    return 0
-
-
-def partie_reception(raw_txt):
-    print(f'reception:{raw_txt}')
-    # unpack event & transmit to mediators
-    parts = raw_txt.split('#')
-    evtype = parts[0]
-    content = json.loads(parts[1])
-    print('handle client fait le passage a un/des mediator(s) count:', len(mediators))
-    for m in mediators:
-        m.post(evtype, content, False)
-
+def _run_client(host_info, port_info):
+    url = f"ws://{host_info}:{port_info}"
+    client_ws = websocket.WebSocketApp(
+        url,
+        on_message=ws_on_message,
+        on_error=ws_on_error,
+        on_close=ws_on_close,
+        on_open=ws_on_open,
+    )
+    client_ws.run_forever()
 
 def start_comms(host_info, port_info):
-    global _receiver_thread, ref_ws
-    _receiver_thread = threading.Thread(target=_receive_updates, args=(host_info, port_info))
-    _receiver_thread.start()
+    # Run the WebSocket client in a separate thread to prevent blocking
+    client_thread = threading.Thread(target=_run_client, args=(host_info, port_info))
+    client_thread.start()
 
-    # because we wish to keep a sync program(not async)
-    # we force the wait. this is effectively like typing 'await' in JS
-    while ref_ws is None:
-        time.sleep(0.1)
+    # mecanisme de blocage volontaire:
+    # Block until the WebSocket connection is successfully established
+    print("Waiting for WebSocket connection...")
+    ws_connected_event.wait()  # Block here until the connection is open
+    print("WebSocket connection established and ready.")
 
 
 def broadcast(event_type, event_content):
     global ref_ws
-    # emit to clientS
+    if ref_ws is None:
+        print("No active WebSocket connection")
+        return
     if event_content is None:
         event_content = 'null'
     richmsg = f'{event_type}#{event_content}'
-    ref_ws.send(richmsg.encode())
+    ref_ws.send(richmsg)
 
-
-def register_mediator(x):
+def register_mediator(mediator):
     global mediators
-    mediators.append(x)
-
+    mediators.append(mediator)
 
 def shutdown_comms():
-    global _receiver_thread, _client_socket
-    if _receiver_thread:
-        _receiver_thread.join()
-    if client_socket:
-        client_socket.close()
+    global ref_ws
+    if ref_ws:
+        ref_ws.close()  # Close the connection gracefully
+        ref_ws = None
 
-# -------------------------------------
-
-
-#
-# class NetwPusher(EvListener):
-#     def on_netw_send(self, ev):
-#         send_data((ev.evt+'#"'+ev.serial+'"').encode())  # after the sym #: you need to find real json format!!!
-#
-#     def on_exit_network(self, ev):
-#         stop_network()
-#
-#     def turn_on(self):
-#         super().turn_on()
-#         start_client()
+def get_server_flag():
+    return 0
