@@ -15,12 +15,12 @@ from pprint import pprint as _pprint
 
 import requests
 
-from . import bundle_ops, cmdline_utils
+from . import cmdline_utils
 from . import cmdline_utils as _utils
 from . import opti_grab_bundle
 from . import server_ops as _netw, pyvcli_defs
 from . import tileset_creator as _ts_creator
-from .cmdline_utils import read_metadata, rewrite_metadata, MetadatEntries, test_isfile_in_cartridge
+from .cmdline_utils import read_metadata, rewrite_metadata, MetadatEntries, test_isfile_in_cartridge, load_metadata_format, fpath_join
 
 
 MODULE_WITH_SERV_CODE = 'netcode'  # module you should put inside the game bundle
@@ -31,24 +31,35 @@ SERV_CODE_START_FUNC = 'exec'
 # -------------------------
 #  private func
 # -------------------------
-def pack_game_cartridge(bundl_name, using_temp_dir=True) -> str:
+def pack_game_cartridge(bundl_name: str) -> str:
     """
-    @param bundl_name:
-    @param using_temp_dir:
-    @return: a path to the produced ZIP archive
+    @return: path to the produced ZIP archive
     """
+    OS_TEMP_DIRECTORY = tempfile.gettempdir()
+
     wrapper_bundle = os.path.join(os.getcwd(), bundl_name)
-    zip_precise_target = os.path.join(wrapper_bundle, 'cartridge')
+    # TODO distinguish hot bundle vs frozen
+    # if frozen:
+    # zip_precise_target = os.path.join(wrapper_bundle, 'cartridge')
+    # else:
+    zip_precise_target = wrapper_bundle
 
     def _inner_func(source_folder, wanted_zip_filename='output.zip'):
-        systmp_directory = tempfile.gettempdir()
-        output_zip_path = os.path.join(systmp_directory, wanted_zip_filename)
+        output_zip_path = os.path.join(OS_TEMP_DIRECTORY, wanted_zip_filename)
+
+        # Flag to check if any files are added to the zip
+        files_found = False
         with zipfile.ZipFile(output_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for root, _, files in os.walk(source_folder):
                 for file in files:
+                    files_found = True  # Found at least one file
                     file_path = os.path.join(root, file)
                     arcname = os.path.relpath(file_path, source_folder)
                     zipf.write(file_path, arcname)
+
+        # Raise an error if no files were added
+        if not files_found:
+            raise ValueError(f"No files found in the directory '{source_folder}' to pack into the ZIP.")
         return output_zip_path
 
     return _inner_func(zip_precise_target)
@@ -333,7 +344,7 @@ def serve(bundle_name, **kwargs) -> None:
         print(f"Error: no {SCRIPT_WITH_SERV_CODE} to be found in the bundle. Are you sure it's a multiplayer game?")
 
 
-def share(bundle_name, dev_flag_on):
+def share(bundle_name: str, dev_flag: bool):
     # TODO in the future,
     #  we may want to create a 'pack' subcommand that would only produce the .zip, not send it elsewhere
     # that pack subcommand would pack and send it to the cwd, whereas the classic pack uses the tempfile/tempdir logic
@@ -344,20 +355,28 @@ def share(bundle_name, dev_flag_on):
     rewrite_metadata(bundle_name, metadat)
 
     slug = metadat['slug']
-    if dev_flag_on:  # in devmode, all tests on metadata are skipped
+    if dev_flag:  # in devmode, all tests on metadata are skipped
         zipfile_path = pack_game_cartridge(slug)
-        print(f'file:{zipfile_path} packed, uploading it now...')
-        _netw.upload_my_zip_file(zipfile_path, slug, True)
-        return
+        print(f'file:{zipfile_path} packed, uploading it now to the <LOCAL/DEVmode> pyVM component.')
 
-    err_msg_lines = [
-        'ERROR: the "share" is impossible yet, invalid metadat.json detected.',
-        'Please use "pyv-cli test BundleName"',
-        'in order to get more information and fix the problem'
-    ]
-    # if we're in prod mode, we HAVE TO pass all tests (slug is valid & available, etc.)
-    # before uploading
-    if _utils.verify_metadata(metadat) is None:
+    else:
+        err_msg_lines = [
+            'ERROR: the "share" is impossible yet, invalid metadat.json detected.',
+            'Please use "pyv-cli test BundleName"',
+            'in order to get more information and fix the problem'
+        ]
+        # if we're in prod mode, we HAVE TO pass all tests (slug is valid & available, etc.)
+        # before uploading
+        # TODO distingu: hot bundle vs frozen
+        # but for now let us assume all bundles are 'hot'
+        script_dir = os.path.dirname(os.path.realpath(__file__))
+        mtd_format = load_metadata_format(fpath_join(script_dir, 'spare_parts', 'metadat_format.json'))
+
+        if _utils.verify_metadata(metadat, mtd_format):  # if not None it implies an error
+            for msg_line in err_msg_lines:  # printing a multi-line error message
+                print(msg_line)
+            return
+
         slug_correctness = ensure_correct_slug(slug)
         while not slug_correctness[0]:
             tmp = input('what alternative do you choose (please select a number: 0 to 3)? ')
@@ -371,10 +390,8 @@ def share(bundle_name, dev_flag_on):
                 _utils.do_bundle_renaming(bundle_name, slug)
                 bundle_name = slug
         zipfile_path = pack_game_cartridge(bundle_name)
-        _netw.upload_my_zip_file(zipfile_path, slug, False)
-    else:
-        for msg_line in err_msg_lines:  # printing a multi-line error message
-            print(msg_line)
+
+    _netw.upload_my_zip_file(zipfile_path, slug, dev_flag)
 
 
 def test(bundle_name):
