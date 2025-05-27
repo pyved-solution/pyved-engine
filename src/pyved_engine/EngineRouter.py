@@ -21,24 +21,25 @@ aware of the engine inner structure
 import time
 from math import degrees as _degrees
 
-from .abstraction.PygameEvSource import PygameEvSource
+from .abstraction.LegitPygameEvSource import LegitPygameEvSource
 from .concr_engin import core
 from .concr_engin import pe_vars
 from . import state_management
 from .AssetsStorage import AssetsStorage
-from .abstraction import EvSystem
-from .abstraction import PygameWrapper  # Step 3: Inject the dependency
+from .abstraction.EvSystem import EngineEvTypes, EvListener, Emitter, EvManager
+
 # from .actors_pattern import Mediator
-from .concr_engin.pe_vars import screen
+from .concr_engin.pe_vars import screen, KengiEv
 from .concr_engin import vscreen as screen_mo
 from .concr_engin import vscreen
+
 from . import hub
 
 # insta-bind so other engine parts can rely on this
 from .creep import actors_pattern
 
-pe_vars.ev_manager = EvSystem.EvManager.instance()
-pe_vars.engine_events = EvSystem.EngineEvTypes
+pe_vars.ev_manager = EvManager.instance()
+pe_vars.engine_events = EngineEvTypes
 
 
 class CodesProxy:
@@ -59,14 +60,30 @@ class EngineRouter:
     # constants that help with engine initialization
     HIGH_RES_MODE, LOW_RES_MODE, RETRO_MODE = 1, 2, 3
 
-    def __init__(self, sublayer_compo):  # TODO injection should be done elsewhere
-        # sublayer_compo: GESublayer (type)
+    # Step 3: Inject the dependency
+    def __init__(self, sublayer_compo, event_src_class=None):  # TODO injection to do elsewhere. At module lvl, no? Could be more convenient
+        # sublayer_compo has to be follow the "GESublayer" interface (GESublayer=fully abstract class)
+
         self.bypass_event_type_checking = False
 
         core.set_sublayer(sublayer_compo)
+        if event_src_class:
+            self.event_src_class = event_src_class  # a class that inherits from DeepEvSource
+        else:
+            self.event_src_class = LegitPygameEvSource
+
         core.save_engine_ref(self)
 
-        self.server_flag=False
+        # - Below: A neat trick to make our engine compatbile with web ctx.
+        # These ar for storing refs on py functions defined in a game cartridge:
+        self.endfunc_ref = self.updatefunc_ref = self.beginfunc_ref = None
+
+        # - for retro-compatibility only:
+        self.stored_upscaling = None
+        self.special_flip = 0
+
+        # - reste of recent attributes
+        self.server_flag = False
         self.low_level_service = sublayer_compo
 
         self.assets_loaded = False
@@ -81,6 +98,13 @@ class EngineRouter:
         }
         self.ev_source = None
         hub.engine_ref = self
+
+        # just a queue for storing events
+        self._kev_storage = list()  # kev because KENGI events =high-level, not using pygame ev codes
+
+    # special func:
+    def get_sublayer(self):
+        return core.get_sublayer()
 
     def get_time(self):
         return time.time()
@@ -98,7 +122,7 @@ class EngineRouter:
         # late bind
         self._hub.update({
             'images': self._storage.images,
-            #'data': self._storage.data,
+            # 'data': self._storage.data,
             'sounds': self._storage.sounds,
             'spritesheets': self._storage.spritesheets,
             'csvdata': self._storage.csvdata
@@ -118,7 +142,8 @@ class EngineRouter:
 
         if self.ready_flag:
             return
-        event_source = second_phase_init(self.low_level_service, maxfps, wcaption)
+        event_source = second_phase_init(self.low_level_service, self.event_src_class, maxfps, wcaption)
+
         self.ev_source = event_source
 
         rez = self.low_level_service.fire_up_backend(engine_mode_id)
@@ -170,8 +195,138 @@ class EngineRouter:
     def draw_polygon(self, *args, **kwargs):
         self.low_level_service.draw_polygon(*args, **kwargs)
 
+    static_mapping = {
+        256: EngineEvTypes.Quit,  # pygame.QUIT is 256
+        32787: EngineEvTypes.Quit,  # for pygame2.0.1+ we also have 32787 -> pygame.WINDOWCLOSE
+        771: EngineEvTypes.BasicTextinput,  # pygame.TEXTINPUT
+
+        32768: EngineEvTypes.Activation,  # pygame.ACTIVEEVENT, has "gain" and "state" attributes
+        32783: EngineEvTypes.FocusGained,  # pygame.WINDOWFOCUSGAINED
+        32784: EngineEvTypes.FocusLost,  # pygame.WINDOWFOCUSLOST
+
+        768: EngineEvTypes.Keydown,  # pygame.KEYDOWN
+        769: EngineEvTypes.Keyup,  # pygame.KEYUP
+        1024: EngineEvTypes.Mousemotion,  # pygame.MOUSEMOTION
+        1025: EngineEvTypes.Mousedown,  # pygame.MOUSEBUTTONDOWN
+        1026: EngineEvTypes.Mouseup,  # pygame.MOUSEBUTTONUP
+
+        # gamepad support
+        1536: EngineEvTypes.Stickmotion,  # JOYAXISMOTION:  self.joy[event.joy].axis[event.axis] = event.value
+        1537: None,  # JOYBALLMOTION:  self.joy[event.joy].ball[event.ball] = event.rel
+        1538: EngineEvTypes.GamepadDir,  # JOYHATMOTION:  self.joy[event.joy].hat[event.hat] = event.value
+        1539: EngineEvTypes.Gamepaddown,  # JOYBUTTONDOWN: self.joy[event.joy].button[event.button] = 1
+        1540: EngineEvTypes.Gamepadup,  # JOYBUTTONUP:  self.joy[event.joy].button[event.button] = 0
+    }
+    joypad_events_bounds = [1536, 1540]
+
+    mouse_event_types = (EngineEvTypes.Mousedown, EngineEvTypes.Mouseup, EngineEvTypes.Mousemotion)
+    Stickmotion_EvT = EngineEvTypes.Stickmotion
+    Gamepaddown_EvT = EngineEvTypes.Gamepaddown
+
+    def _map_etype2kengi(self, alien_etype):
+        if alien_etype not in self.static_mapping:
+            if self.debug_mode:  # notify that there's no conversion
+                print('[no conversion] pygame etype=', alien_etype)  # alien_etype.dict)
+        else:
+            if self.joypad_events_bounds[0] <= alien_etype <= self.joypad_events_bounds[1]:
+                pass
+                # for convenient gamepad support, we map pygame JOY* in a more specialized way (xbox360 pad support) 2/2
+                # else:
+            return self.static_mapping[alien_etype]
+
     def event_get(self):
-        return self.ev_source.fetch_kengi_events()
+        cst_joyaxismotion = 1536
+        cst_joyballmotion = 1537
+        cst_hatmotion = 1538
+        cst_joydown = 1539
+        cst_joyup = 1540
+
+        raw_pyg_events = self.ev_source.fetch_raw_events()
+        del self._kev_storage[:]
+
+        # ------------------------
+        #  a very special event has to be handled
+        # ------------------------
+        # type=VIDEORESIZE args=(size, w, h)
+
+        def exit_fullscreen():
+            # - WARNING -
+            # this needs to be the same value in PygameWrapper
+            CSIZE = (1366, 768)
+            new_disp = self.low_level_service.display.set_mode(CSIZE, self.low_level_service.RESIZABLE)
+            vscreen.refresh_screen_params(
+                CSIZE, realscreen=new_disp
+            )
+            vscreen.fullscreen_flag = False
+
+        for pyev in raw_pyg_events:
+            r = None
+            if pyev.type == self.low_level_service.VIDEORESIZE:
+                vscreen.refresh_screen_params(pyev.size)
+
+            elif hasattr(pyev, 'key') and pyev.key == self.low_level_service.K_F11:  # F11 interaction
+                if pyev.type == 768:  # keydown
+                    if vscreen.fullscreen_flag:
+                        exit_fullscreen()
+                    else:
+                        disp = self.low_level_service.display.set_mode((0, 0), self.low_level_service.FULLSCREEN)
+                        vscreen.refresh_screen_params(
+                            disp.get_size(), realscreen=disp
+                        )
+                        vscreen.fullscreen_flag = True
+                # the keyup will be automatically ignored due to how we built the if ... condition
+            elif hasattr(pyev, 'key') and pyev.key == self.low_level_service.K_ESCAPE:
+                if pyev.type == 768 and vscreen.fullscreen_flag:
+                    exit_fullscreen()
+                # also: need to forward informations about the escape key
+                r = (self._map_etype2kengi(pyev.type), pyev.dict)
+
+            # for convenient gamepad support, we will
+            # map pygame JOY* in a specialized way (xbox360 pad support)
+            elif pyev.type == cst_joyaxismotion:
+                if pyev.axis in (0, 1):
+                    self.lstick_val_cache[pyev.axis] = pyev.value
+                    r = (self.Stickmotion_EvT, {'side': 'left', 'pos': tuple(self.lstick_val_cache)})
+
+                elif pyev.axis in (2, 3):
+                    self.rstick_val_cache[-2 + pyev.axis] = pyev.value
+                    r = (self.Stickmotion_EvT, {'side': 'right', 'pos': tuple(self.rstick_val_cache)})
+
+                elif pyev.axis == 4:
+                    r = (self.Gamepaddown_EvT, {'button': 'lTrigger', 'value': pyev.value})
+
+                elif pyev.axis == 5:
+                    r = (self.Gamepaddown_EvT, {'button': 'rTrigger', 'value': pyev.value})
+
+            elif pyev.type == cst_joyballmotion:
+                # ignore
+                pass
+
+            elif pyev.type == cst_hatmotion:  # joy Dpad has been activated
+                # <Event(1538-JoyHatMotion {'joy': 0, 'instance_id': 0, 'hat': 0, 'value': (0, 0)})>
+                setattr(pyev, 'dir', self.dpad_mapping[pyev.value])  # east, west, etc.
+                tmp = list(pyev.value)
+                if tmp[1] != 0:
+                    tmp[1] *= -1
+                pyev.value = pyev.dict['value'] = tuple(tmp)
+                r = (self._map_etype2kengi(pyev.type), pyev.dict)
+
+            elif pyev.type == cst_joydown or pyev.type == cst_joyup:  # joybtdown/joybtup
+                pyev.button = self.joy_bt_map[pyev.button]  # change name of the button
+                setattr(pyev, 'value', int(pyev.type == cst_joydown))
+                r = (self._map_etype2kengi(pyev.type), pyev.dict)
+
+            else:
+                r = (self._map_etype2kengi(pyev.type), pyev.dict)
+
+            # modify mouse events
+            if r is not None:  # some events have been ignored/ filtered out
+                if r[0] in self.mouse_event_types:
+                    r[1]['pos'] = vscreen.proj_to_vscreen(r[1]['pos'])
+                    # TODO what about ev.rel attribute?
+                self._kev_storage.append(KengiEv(r[0], **r[1]))
+
+        return self._kev_storage
 
     # --- legit pyved functions
     def bootstrap_e(self):
@@ -204,7 +359,7 @@ class EngineRouter:
         from . import defs
         from .patterns import ecs
         from .looparts import rogue
-        from .import umediator
+        from . import umediator
         self._hub.update({
             'umediator': umediator,
             'ecs': ecs,
@@ -214,9 +369,9 @@ class EngineRouter:
             'gfx': gfx,
             'actors': actors_pattern,
             'game_events_enum': game_events_enum,
-            'EvListener': EvSystem.EvListener,
-            'Emitter': EvSystem.Emitter,
-            'EngineEvTypes': EvSystem.EngineEvTypes,
+            'EvListener': EvListener,
+            'Emitter': Emitter,
+            'EngineEvTypes': EngineEvTypes,
             'GameTpl': GameTpl.GameTpl,
             'struct': custom_struct,
             'terrain': _terrain,
@@ -289,7 +444,7 @@ class EngineRouter:
         return self.low_level_service.new_clock_obj()
 
     def get_ev_manager(self):
-        return EvSystem.EvManager.instance()
+        return EvManager.instance()
 
     def flip(self):
         screen_mo.flip()
@@ -303,7 +458,8 @@ class EngineRouter:
         return self.low_level_service.new_rect_obj(*args)
 
     def close_game(self):
-        self._storage.flush_mem()
+        if self._storage:  # need to test bc if no assets preloaded, this is None
+            self._storage.flush_mem()
         self.low_level_service.quit()
 
     def surface_create(self, size):
@@ -312,47 +468,24 @@ class EngineRouter:
     def surface_rotate(self, img, angle):
         return dep_linking.pygame.transform.rotate(img, _degrees(-1 * angle))
 
-    # - deprecated , but still used by launch_game.py -----------------------
-    def run_game(self, initfunc, updatefunc, endfunc, **kwargs):
-        print('----------------dans run_game--------------------------------')
-        print(kwargs)
-        print('.')
+    @staticmethod
+    def run_game(initfunc, updatefunc, endfunc, **kwargs):  # still used by launch_game.py, as of May25
+        # -------- WARNING! --------
+        # this func can only be called by launch_game.py (local) or via the command line tool
+        # this func will NEVER work in the web ctx
+        print('<< local ctx - run_game >> DEBUG message, kwargs are:', kwargs)
 
-        # TODO this should be deleted
-        #  as it wont work in Track- #1 + web
-        experimental_webpy = __import__('sys').platform in ('emscripten', 'wasi')
+        # initfunc(None)  # if we remove kwargs, we cant launch a game client with parameters such as host=...
+        initfunc(None, **kwargs)
+        while not pe_vars.gameover:
+            # it is assumed that the developer calls pyv.flip, once per frame,
+            # without the engine taking responsability for that
+            updatefunc(time.time())
+        endfunc(None)
 
-        if not experimental_webpy:  # the regular execution
-            print('run_game >>> kwargs:', kwargs)
-            # initfunc(None)  # if we remove kwargs, we cant launch a game client with parameters such as host=...
-            initfunc(None, **kwargs)
-
-            while not pe_vars.gameover:
-                # it's assumed that the developer calls pyv.flip, once per frame,
-                # without the engine having to take care of that
-                updatefunc(time.time())
-            endfunc(None)
-        else:
-            raise NotImplementedError
-
-        # added by another contributor (not tom)
-
-        # else:  # experimental part: for wasm, etc
-        #     import asyncio
-        #     async def async_run_game():
-        #         initfunc(None)
-        #         while not pe_vars.gameover:
-        #             updatefunc(time.time())
-        #             self.flip()  # commit gfx mem to screen, already contains the .tick
-        #             await asyncio.sleep(0)
-        #         endfunc(None)
-        #     asyncio.run(async_run_game())
-
-    # --- trick to use either the hub or the sublayer
-    def __getattr__(self, item):
+    def __getattr__(self, item):  # a hack so we automatically use: either the hub or the sublayer
         if item in self._hub:
             return self._hub[item]
-
         return getattr(self.low_level_service, item)
 
 
@@ -368,7 +501,7 @@ _scr_init_flag = False
 
 
 # --- rest of functions ---
-def second_phase_init(lower_level_svc, maxfps=None, wcaption=None, print_ver_info=True):
+def second_phase_init(lower_level_svc, event_source_cls, maxfps=None, wcaption=None):
     global _engine_rdy
     # TODO check when to use mediator
     if maxfps is None:
@@ -380,13 +513,18 @@ def second_phase_init(lower_level_svc, maxfps=None, wcaption=None, print_ver_inf
     # here,
     #  we do heavy lifting to bind the pygame event source with the high-level event manager
 
-    #from . import abstraction
-    #_pyv_backend = abstraction.build_primalbackend(pe_vars.backend_name)
+    # from . import abstraction
+    # _pyv_backend = abstraction.build_primalbackend(pe_vars.backend_name)
     # (SIDE-EFFECT: Building the backend also sets kengi_inj.pygame )
 
     # TODO one item in the long sequence of dep. injections is to be found there:
     #  check where to put the rest
-    oneof_pyv_backend = PygameEvSource()
+    oneof_pyv_backend = event_source_cls(
+        pe_vars.engine_events  # we have to pass:
+        # our custom engine's all event types --> to the DeepEventSource we're instantiating,
+        # in this way, the DeepEvSource will be able to map its own event codes to PyvedEngine event codes ...
+        # tricky but this does work (May25)
+    )
 
     # pbe_identifier: str / values accepted -> to make a valid func. call you would either pass '' or 'web'
     # libbundle_ver: str
@@ -427,10 +565,9 @@ def second_phase_init(lower_level_svc, maxfps=None, wcaption=None, print_ver_inf
     # deep_ev_source_cls = 'CanvasBasedEvSource'
     # ws_transport_cls = 'WsTransportWebCtx'
 
-
     # CAREFUL: if you dont call the line below,
     # the high level event system wont work (program hanging)
-    EvSystem.EvManager.instance().a_event_source = oneof_pyv_backend
+    EvManager.instance().a_event_source = oneof_pyv_backend
 
     lower_level_svc.init()
     if wcaption:

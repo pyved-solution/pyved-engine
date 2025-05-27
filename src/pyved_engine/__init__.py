@@ -24,16 +24,36 @@ from .concr_engin import pe_vars as defs
 
 
 _stored_kbackend = None
-defs.weblib_sig = _backend_name = ''  # deprec.
+_context_type = 'local'
+_router_singleton = None
+_stored_ev_source_cls = None
 
 
-def get_engine_router():
+def set_exec_context(context_type: str, binding=None, stored_cls=None):
+    global _context_type, _stored_kbackend, _stored_ev_source_cls
+    assert context_type in ('local', 'web')
+    _context_type = context_type
+    if 'web' == context_type:
+        if binding is None:
+            raise ValueError('the "binding" argument is missing, in case of a web ctx')
+        if stored_cls is None:
+            raise ValueError('missing ev_source_cls')
+        _stored_kbackend = binding
+        _stored_ev_source_cls = stored_cls
+
+
+def get_engine_router() -> EngineRouter:
+    """
+    :return: the unique instance of EngineRouter class
+    """
+    global _router_singleton
+    if _router_singleton:
+        return _router_singleton
     from .EngineRouter import EngineRouter
-    from .abstraction.PygameWrapper import PygameWrapper
-    return EngineRouter(PygameWrapper())
-
-
-def set_webbackend_type(xval):
-    global _backend_name
-    defs.weblib_sig = _backend_name = xval
-    defs.backend_name = 'web'
+    if 'local' == _context_type:
+        from .abstraction.PygameWrapper import PygameWrapper
+        xcls = PygameWrapper
+    else:
+        xcls = _stored_kbackend
+    y = _router_singleton = EngineRouter(xcls(), _stored_ev_source_cls)
+    return y

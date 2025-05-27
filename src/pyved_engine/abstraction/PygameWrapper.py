@@ -30,6 +30,9 @@ class PygameWrapper(GESublayer):
         # copy many pygame constants
         self.SRCALPHA = self._pygame.SRCALPHA
         self.RLEACCEL = self._pygame.RLEACCEL
+        self.VIDEORESIZE = self._pygame.VIDEORESIZE
+        self.FULLSCREEN = self._pygame.FULLSCREEN
+        self.RESIZABLE = self._pygame.RESIZABLE
 
         # STOP using these as we create a higher-level of abstraction event system,
         # see EngineEvTypes
@@ -79,6 +82,8 @@ class PygameWrapper(GESublayer):
         self.K_x = self._pygame.K_x
         self.K_y = self._pygame.K_y
         self.K_z = self._pygame.K_z
+
+        self.K_F11 = self._pygame.K_F11
 
     def get_pressed(self):
         return self._pygame.key.get_pressed()

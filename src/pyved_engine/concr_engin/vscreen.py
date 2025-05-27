@@ -42,28 +42,6 @@ def conv_to_vscreen(x, y):
     return int(x / stored_upscaling), int(y / stored_upscaling)
 
 
-def refresh_screen_params(size, realscreen=None):
-    global _vsurface, stored_upscaling, game_window_size, offsets, real_pygamescreen
-    newval_w, newval_h = size
-    print('## refresh screen ##', size)
-    game_window_size[0], game_window_size[1] = 160 * stored_lambda, 90 * stored_lambda
-    prev_k_factor = 1
-    k_candidate = 2
-    while (k_candidate*game_window_size[0]) < newval_w+1 and (k_candidate*game_window_size[1]) < newval_h+1:
-        prev_k_factor = k_candidate
-        k_candidate += 1
-    stored_upscaling = prev_k_factor
-
-    print('disp:', size)
-    disp_w, disp_h = size
-    print(f'lambda={stored_lambda}  ; CALC Window {game_window_size}:upscale={stored_upscaling}:offsets={offsets}')
-    widget_s = [stored_upscaling*game_window_size[0], stored_upscaling*game_window_size[1]]
-    offsets[0], offsets[1] = (disp_w-widget_s[0]) // 2,  (disp_h-widget_s[1]) // 2
-
-    if realscreen:
-        real_pygamescreen = realscreen
-
-
 def do_screen_param(lower_level_svc, lambda_factor, display_size, cached_paintev) -> None:
     """
     :param lambda_factor: in the range 1-3. Multiplier applied to 160x90 to comptute the game window (no upscaling)
@@ -82,6 +60,9 @@ def do_screen_param(lower_level_svc, lambda_factor, display_size, cached_paintev
     refresh_screen_params(display_size)  #real_pygamescreen.get_size())
 
     _vsurface = lower_level_svc.new_surface_obj(game_window_size)
+
+    if _vsurface is None:
+        raise ValueError('something\'s really off with screen surface initialization (vscreen.do_screen_param func)')
     pe_vars.screen = _vsurface
     if cached_paintev:
         cached_paintev.screen = _vsurface
@@ -119,8 +100,33 @@ def do_screen_param(lower_level_svc, lambda_factor, display_size, cached_paintev
     #         # this line is useful for enabling mouse_pos computations even in webCtx
     #         stored_upscaling = float(adhoc_upscaling)
 
-    real_pygamescreen = lower_level_svc.display.get_surface()  # assert its size == display_size
+    real_pygamescreen = lower_level_svc.display.get_surface()
+    assert real_pygamescreen is not None
+    assert real_pygamescreen.get_size() == display_size
+
     _is_scr_init = True
+
+
+def refresh_screen_params(size, realscreen=None):
+    global _vsurface, stored_upscaling, game_window_size, offsets, real_pygamescreen
+    newval_w, newval_h = size
+    print('## refresh screen ##', size)
+    game_window_size[0], game_window_size[1] = 160 * stored_lambda, 90 * stored_lambda
+    prev_k_factor = 1
+    k_candidate = 2
+    while (k_candidate*game_window_size[0]) < newval_w+1 and (k_candidate*game_window_size[1]) < newval_h+1:
+        prev_k_factor = k_candidate
+        k_candidate += 1
+    stored_upscaling = prev_k_factor
+
+    print('disp:', size)
+    disp_w, disp_h = size
+    print(f'lambda={stored_lambda}  ; CALC Window {game_window_size}:upscale={stored_upscaling}:offsets={offsets}')
+    widget_s = [stored_upscaling*game_window_size[0], stored_upscaling*game_window_size[1]]
+    offsets[0], offsets[1] = (disp_w-widget_s[0]) // 2,  (disp_h-widget_s[1]) // 2
+
+    if realscreen:
+        real_pygamescreen = realscreen
 
 
 def flip():
