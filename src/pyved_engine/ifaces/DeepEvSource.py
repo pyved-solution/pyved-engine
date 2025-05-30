@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 
 class DeepEvSource(ABC):
     @abstractmethod
-    def fetch_kengi_events(self):
+    def fetch_raw_events(self):
         pass
 
     @abstractmethod

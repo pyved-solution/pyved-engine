@@ -30,6 +30,10 @@ class GESublayer(ABC):
         pass
 
     @abstractmethod
+    def quit(self):  # pygame initialization
+        pass
+
+    @abstractmethod
     def init_sound(self):
         pass
 
