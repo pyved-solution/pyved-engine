@@ -1,10 +1,8 @@
-import time
-
 from ._classes import BaseGameState
 from .abstraction import EvSystem
 from .concr_engin import pe_vars
-from .concr_engin import vscreen
 from .custom_struct import Stack, StContainer, enum
+
 
 multistite_flag = False
 stack_based_ctrl = None
@@ -118,26 +116,27 @@ class StateStackCtrl(EvSystem.EvListener):
         self._pop_state()
 
     # - helper function -
+    # TODO how to make this cls compatible with Web ctx, then?
     def loop(self) -> None:
-        """
-        its forbidden to call .loop() in the web ctx, but its convenient in the local ctx
-        if one wants to test a program without harnessing the whole pyVM
-        """
-        print('*Warning! Never use .loop in the web Ctx*')
-        self.turn_on()
-        e_types = EvSystem.EngineEvTypes
+        raise NotImplementedError
+        # its forbidden to call .loop() in the web ctx, but its convenient in the local ctx
+        # if one wants to test a program without harnessing the whole pyVM
 
-        self.pev(e_types.Gamestart)  # ensure we will call .enten() on the initial/eden state
-        while not pe_vars.gameover:
-            infot = time.time()
-            self.pev(e_types.Update, curr_t=infot)
-            self.pev(e_types.Paint, screen=pe_vars.screen)
-            self._manager.update()
-            vscreen.flip()
-            self._clock.tick(pe_vars.max_fps)
-        # TODO shall we ensure we have pop'ed every single state?
-        # self.proper_exit()
-        print(self.__class__.INFO_STOP_LOOP_MSG)
+        # print('*Warning! Never use .loop in the web Ctx*')
+        # self.turn_on()
+        # e_types = EvSystem.EngineEvTypes
+        #
+        # self.pev(e_types.Gamestart)  # ensure we will call .enten() on the initial/eden state
+        # while not pe_vars.gameover:
+        #     infot = time.time()
+        #     self.pev(e_types.Update, curr_t=infot)
+        #     self.pev(e_types.Paint, screen=pe_vars.screen)
+        #     self._manager.update()
+        #     vscreen.flip()
+        #     self._clock.tick(pe_vars.max_fps)
+        # # TODO shall we ensure we have pop'ed every single state?
+        # # self.proper_exit()
+        # print(self.__class__.INFO_STOP_LOOP_MSG)
 
 
 def declare_game_states(gs_enum, assoc_gscode_gscls):

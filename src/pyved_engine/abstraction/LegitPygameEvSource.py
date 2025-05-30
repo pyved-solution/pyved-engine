@@ -1,6 +1,4 @@
-from ..concr_engin import vscreen
 from ..ifaces.DeepEvSource import DeepEvSource
-
 from ..concr_engin.pe_vars import KengiEv
 
 

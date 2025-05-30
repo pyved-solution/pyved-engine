@@ -1,43 +1,35 @@
 """
-Goals of this script:
+GOALS:
 
-- to perform a double dependency injection
-and apply it to the engine (can add stuff straight into pe_vars)
-+ set screen parameters properly +bootstrap_x
+- perform a double dependency injection and apply it to the engine
+(can add stuff straight into pe_vars) + set screen parameters properly +bootstrap_x
 so the engine becomes actionable right away
-
-- be a gateway to the AssetsStorage part
 
 - play the role of a facade that kinda "merges":
    Engine_constants + Engine_GameDev_api + list_of_EngineEvTypes + all_Keycodes_ever_invented
  so the "concr_engin" folder is really a large blob we don't have to mess with anymore,
  the facade being nicely plugged on top of it
 
+- be a gateway to the AssetsStorage part
+
 - be a gateway to the 'Hub' part of the game engine, so we encapsulate everything
 the game dev knows keywords such as "pyv.story" or "pyv.rpg" but should never be
 aware of the engine inner structure
 """
-
 import time
 from math import degrees as _degrees
 
-from .abstraction.LegitPygameEvSource import LegitPygameEvSource
-from .concr_engin import core
-from .concr_engin import pe_vars
+from . import hub
 from . import state_management
 from .AssetsStorage import AssetsStorage
 from .abstraction.EvSystem import EngineEvTypes, EvListener, Emitter, EvManager
+from .abstraction.LegitPygameEvSource import LegitPygameEvSource
+from .concr_engin import core
+from .concr_engin import pe_vars
+from .concr_engin.pe_vars import KengiEv
 
-# from .actors_pattern import Mediator
-from .concr_engin.pe_vars import screen, KengiEv
-from .concr_engin import vscreen as screen_mo
-from .concr_engin import vscreen
-
-from . import hub
 
 # insta-bind so other engine parts can rely on this
-from .creep import actors_pattern
-
 pe_vars.ev_manager = EvManager.instance()
 pe_vars.engine_events = EngineEvTypes
 
@@ -61,26 +53,21 @@ class EngineRouter:
     HIGH_RES_MODE, LOW_RES_MODE, RETRO_MODE = 1, 2, 3
 
     # Step 3: Inject the dependency
-    def __init__(self, sublayer_compo, event_src_class=None):  # TODO injection to do elsewhere. At module lvl, no? Could be more convenient
+    def __init__(self, sublayer_compo, event_src_class=None):
+        # TODO injection to do elsewhere. At module lvl, no? Could be more convenient
+
         # sublayer_compo has to be follow the "GESublayer" interface (GESublayer=fully abstract class)
-
         self.bypass_event_type_checking = False
-
         core.set_sublayer(sublayer_compo)
         if event_src_class:
             self.event_src_class = event_src_class  # a class that inherits from DeepEvSource
         else:
             self.event_src_class = LegitPygameEvSource
-
         core.save_engine_ref(self)
 
         # - Below: A neat trick to make our engine compatbile with web ctx.
         # These ar for storing refs on py functions defined in a game cartridge:
         self.endfunc_ref = self.updatefunc_ref = self.beginfunc_ref = None
-
-        # - for retro-compatibility only:
-        self.stored_upscaling = None
-        self.special_flip = 0
 
         # - reste of recent attributes
         self.server_flag = False
@@ -102,9 +89,8 @@ class EngineRouter:
         # just a queue for storing events
         self._kev_storage = list()  # kev because KENGI events =high-level, not using pygame ev codes
 
-    # special func:
     def get_sublayer(self):
-        return core.get_sublayer()
+        return self.low_level_service
 
     def get_time(self):
         return time.time()
@@ -136,8 +122,19 @@ class EngineRouter:
     def get_version():
         return pe_vars.ENGINE_VERSION_STR
 
-    def init(self, engine_mode_id: int, maxfps=None, wcaption=None, forced_size=None, cached_paint_ev=None,
+    def init(self, lambda_factor: int, maxfps=None, wcaption=None, forced_size=None, cached_paint_ev=None,
              multistate_info=None) -> None:
+        """
+        CAREFUL it is not the constructor, this is the engine router init func!
+
+        :param lambda_factor: or L, it tells the game engine many pixels we want, to draw our game. L *(160x90)
+        :param maxfps:
+        :param wcaption:
+        :param forced_size:
+        :param cached_paint_ev:
+        :param multistate_info:
+        :return:
+        """
         global _engine_rdy, _upscaling_var, _existing_game_ctrl
 
         if self.ready_flag:
@@ -145,11 +142,7 @@ class EngineRouter:
         event_source = second_phase_init(self.low_level_service, self.event_src_class, maxfps, wcaption)
 
         self.ev_source = event_source
-
-        rez = self.low_level_service.fire_up_backend(engine_mode_id)
-
-        if engine_mode_id is None:
-            mode = self.HIGH_RES_MODE
+        self.low_level_service.fire_up_backend(lambda_factor)
 
         # back to times when we used the _hub file
         # _hub.modules_activation()  # bootstrap done so... all good to fire-up pyv modules
@@ -168,12 +161,16 @@ class EngineRouter:
         # if i remove it will it break all?
         # vscreen.cached_pygame_mod = dep_linking.pygame
 
-        self.low_level_service.set_mode()  # pygame display gets activated
         print('setting screen params...')
+        self.low_level_service.set_mode()  # pygame display gets activated
 
-        screen_mo.do_screen_param(
-            self.low_level_service, engine_mode_id, self.low_level_service.get_window_size(), cached_paint_ev
+        #
+        y = self.low_level_service.do_screen_param(
+            lambda_factor,
+            self.low_level_service.get_window_size(),
+            cached_paint_ev
         )
+        pe_vars.screen = y
 
         # for retro-compat
         if multistate_info:
@@ -245,39 +242,24 @@ class EngineRouter:
         del self._kev_storage[:]
 
         # ------------------------
-        #  a very special event has to be handled
+        #  a special event has to be handled
         # ------------------------
-        # type=VIDEORESIZE args=(size, w, h)
-
-        def exit_fullscreen():
-            # - WARNING -
-            # this needs to be the same value in PygameWrapper
-            CSIZE = (1366, 768)
-            new_disp = self.low_level_service.display.set_mode(CSIZE, self.low_level_service.RESIZABLE)
-            vscreen.refresh_screen_params(
-                CSIZE, realscreen=new_disp
-            )
-            vscreen.fullscreen_flag = False
-
         for pyev in raw_pyg_events:
             r = None
             if pyev.type == self.low_level_service.VIDEORESIZE:
-                vscreen.refresh_screen_params(pyev.size)
+                self.adapt_window_size(pyev.size)
 
             elif hasattr(pyev, 'key') and pyev.key == self.low_level_service.K_F11:  # F11 interaction
                 if pyev.type == 768:  # keydown
-                    if vscreen.fullscreen_flag:
-                        exit_fullscreen()
+                    if self.fullscreen_flag:
+                        self.low_level_service.exit_fullscreen()
                     else:
-                        disp = self.low_level_service.display.set_mode((0, 0), self.low_level_service.FULLSCREEN)
-                        vscreen.refresh_screen_params(
-                            disp.get_size(), realscreen=disp
-                        )
-                        vscreen.fullscreen_flag = True
+                        self.low_level_service.enter_fullscreen()
+
                 # the keyup will be automatically ignored due to how we built the if ... condition
             elif hasattr(pyev, 'key') and pyev.key == self.low_level_service.K_ESCAPE:
-                if pyev.type == 768 and vscreen.fullscreen_flag:
-                    exit_fullscreen()
+                if pyev.type == 768 and self.low_level_service.is_fullscreen():
+                    self.low_level_service.exit_fullscreen()
                 # also: need to forward informations about the escape key
                 r = (self._map_etype2kengi(pyev.type), pyev.dict)
 
@@ -322,7 +304,7 @@ class EngineRouter:
             # modify mouse events
             if r is not None:  # some events have been ignored/ filtered out
                 if r[0] in self.mouse_event_types:
-                    r[1]['pos'] = vscreen.proj_to_vscreen(r[1]['pos'])
+                    r[1]['pos'] = self.proj_to_vscreen(r[1]['pos'])
                     # TODO what about ev.rel attribute?
                 self._kev_storage.append(KengiEv(r[0], **r[1]))
 
@@ -433,7 +415,7 @@ class EngineRouter:
         # pygm = _kengi_inj['pygame']
         mpos = self.low_level_service.mouse.get_pos()
         # return _kengi_inj['vscreen'].proj_to_vscreen(mpos)
-        return vscreen.proj_to_vscreen(mpos)
+        return self.proj_to_vscreen(mpos)
 
     def get_surface(self):
         if pe_vars.screen is None:
@@ -445,11 +427,6 @@ class EngineRouter:
 
     def get_ev_manager(self):
         return EvManager.instance()
-
-    def flip(self):
-        screen_mo.flip()
-        if pe_vars.max_fps:
-            pe_vars.clock.tick(pe_vars.max_fps)
 
     def new_font_obj(self, font_src, font_size: int):  # src can be None!
         return self.low_level_service.new_font_obj(font_src, font_size)
@@ -466,7 +443,7 @@ class EngineRouter:
         return self.low_level_service.new_surface_obj(size)
 
     def surface_rotate(self, img, angle):
-        return dep_linking.pygame.transform.rotate(img, _degrees(-1 * angle))
+        return self.low_level_service.transform.rotate(img, _degrees(-1 * angle))
 
     @staticmethod
     def run_game(initfunc, updatefunc, endfunc, **kwargs):  # still used by launch_game.py, as of May25
@@ -487,6 +464,11 @@ class EngineRouter:
         if item in self._hub:
             return self._hub[item]
         return getattr(self.low_level_service, item)
+
+    def flip(self):
+        self.low_level_service.vscreen_flip()
+        if pe_vars.max_fps:
+            pe_vars.clock.tick(pe_vars.max_fps)
 
 
 # ------------------------------------------------------------+------------------
