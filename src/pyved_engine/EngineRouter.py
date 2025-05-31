@@ -86,6 +86,7 @@ class EngineRouter:
         self.ev_source = None
         hub.engine_ref = self
 
+        self._low_lvl_ev_buffer = list()
         # just a queue for storing events
         self._kev_storage = list()  # kev because KENGI events =high-level, not using pygame ev codes
 
@@ -136,13 +137,17 @@ class EngineRouter:
         :return:
         """
         global _engine_rdy, _upscaling_var, _existing_game_ctrl
-
+        print(self.low_level_service.K_F11)
         if self.ready_flag:
             return
         event_source = second_phase_init(self.low_level_service, self.event_src_class, maxfps, wcaption)
 
         self.ev_source = event_source
         self.low_level_service.fire_up_backend(lambda_factor)
+        print('>>>fire_up_backend done')
+
+        # print('setting screen params...')
+        # self.low_level_service.set_lambda(lambda_factor)  # pygame display gets activated
 
         # back to times when we used the _hub file
         # _hub.modules_activation()  # bootstrap done so... all good to fire-up pyv modules
@@ -161,10 +166,6 @@ class EngineRouter:
         # if i remove it will it break all?
         # vscreen.cached_pygame_mod = dep_linking.pygame
 
-        print('setting screen params...')
-        self.low_level_service.set_mode()  # pygame display gets activated
-
-        #
         y = self.low_level_service.do_screen_param(
             lambda_factor,
             self.low_level_service.get_window_size(),
@@ -238,50 +239,40 @@ class EngineRouter:
         cst_joydown = 1539
         cst_joyup = 1540
 
-        raw_pyg_events = self.ev_source.fetch_raw_events()
         del self._kev_storage[:]
-
+        self.ev_source.upload_raw_events(self._low_lvl_ev_buffer)
         # ------------------------
         #  a special event has to be handled
         # ------------------------
-        for pyev in raw_pyg_events:
-            r = None
+        for pyev in self._low_lvl_ev_buffer:
+            ev_pyved_repr = None
+
             if pyev.type == self.low_level_service.VIDEORESIZE:
+                # print('-->detection au niveau EngineRoute event resize')
                 self.adapt_window_size(pyev.size)
+                if self.low_level_service.is_fullscreen():
+                    self.low_level_service.fullscreen_flag = False
+                    print('forced update of the fullscreen_flag!')
 
             elif hasattr(pyev, 'key') and pyev.key == self.low_level_service.K_F11:  # F11 interaction
                 if pyev.type == 768:  # keydown
-                    if self.fullscreen_flag:
-                        self.low_level_service.exit_fullscreen()
-                    else:
+                    if not self.low_level_service.is_fullscreen():
                         self.low_level_service.enter_fullscreen()
+                    else:
+                        self.low_level_service.exit_fullscreen()  # in fact, this will only be called in local ctx
 
-                # the keyup will be automatically ignored due to how we built the if ... condition
             elif hasattr(pyev, 'key') and pyev.key == self.low_level_service.K_ESCAPE:
                 if pyev.type == 768 and self.low_level_service.is_fullscreen():
                     self.low_level_service.exit_fullscreen()
-                # also: need to forward informations about the escape key
-                r = (self._map_etype2kengi(pyev.type), pyev.dict)
+                else:
+                    # also: need to forward informations about the escape key
+                    ev_pyved_repr = (self._map_etype2kengi(pyev.type), pyev.dict)
 
-            # for convenient gamepad support, we will
-            # map pygame JOY* in a specialized way (xbox360 pad support)
-            elif pyev.type == cst_joyaxismotion:
-                if pyev.axis in (0, 1):
-                    self.lstick_val_cache[pyev.axis] = pyev.value
-                    r = (self.Stickmotion_EvT, {'side': 'left', 'pos': tuple(self.lstick_val_cache)})
-
-                elif pyev.axis in (2, 3):
-                    self.rstick_val_cache[-2 + pyev.axis] = pyev.value
-                    r = (self.Stickmotion_EvT, {'side': 'right', 'pos': tuple(self.rstick_val_cache)})
-
-                elif pyev.axis == 4:
-                    r = (self.Gamepaddown_EvT, {'button': 'lTrigger', 'value': pyev.value})
-
-                elif pyev.axis == 5:
-                    r = (self.Gamepaddown_EvT, {'button': 'rTrigger', 'value': pyev.value})
-
+            # -----------------------------
+            #   convenient gamepad support
+            # -----------------------------
+            # map pygame JOY* in a specialized way --> xbox360 pad support
             elif pyev.type == cst_joyballmotion:
-                # ignore
                 pass
 
             elif pyev.type == cst_hatmotion:  # joy Dpad has been activated
@@ -291,29 +282,41 @@ class EngineRouter:
                 if tmp[1] != 0:
                     tmp[1] *= -1
                 pyev.value = pyev.dict['value'] = tuple(tmp)
-                r = (self._map_etype2kengi(pyev.type), pyev.dict)
+                ev_pyved_repr = (self._map_etype2kengi(pyev.type), pyev.dict)
 
-            elif pyev.type == cst_joydown or pyev.type == cst_joyup:  # joybtdown/joybtup
+            elif pyev.type == cst_joyaxismotion:
+                if pyev.axis in (0, 1):
+                    self.lstick_val_cache[pyev.axis] = pyev.value
+                    ev_pyved_repr = (self.Stickmotion_EvT, {'side': 'left', 'pos': tuple(self.lstick_val_cache)})
+                elif pyev.axis in (2, 3):
+                    self.rstick_val_cache[-2 + pyev.axis] = pyev.value
+                    ev_pyved_repr = (self.Stickmotion_EvT, {'side': 'right', 'pos': tuple(self.rstick_val_cache)})
+                elif pyev.axis == 4:
+                    ev_pyved_repr = (self.Gamepaddown_EvT, {'button': 'lTrigger', 'value': pyev.value})
+                elif pyev.axis == 5:
+                    ev_pyved_repr = (self.Gamepaddown_EvT, {'button': 'rTrigger', 'value': pyev.value})
+
+            elif pyev.type in (cst_joydown, cst_joyup):  # joybtdown/joybtup
                 pyev.button = self.joy_bt_map[pyev.button]  # change name of the button
                 setattr(pyev, 'value', int(pyev.type == cst_joydown))
-                r = (self._map_etype2kengi(pyev.type), pyev.dict)
+                ev_pyved_repr = (self._map_etype2kengi(pyev.type), pyev.dict)
 
-            else:
-                r = (self._map_etype2kengi(pyev.type), pyev.dict)
+            else:  # keypresses, mouse clicks, etc.
+                e_type = self._map_etype2kengi(pyev.type)
+                e_kwargs = pyev.dict
+                if e_type in self.mouse_event_types:
+                    e_kwargs['pos'] = self.proj_to_vscreen(e_kwargs['pos'])
+                ev_pyved_repr = (e_type, e_kwargs)
 
             # modify mouse events
-            if r is not None:  # some events have been ignored/ filtered out
-                if r[0] in self.mouse_event_types:
-                    r[1]['pos'] = self.proj_to_vscreen(r[1]['pos'])
-                    # TODO what about ev.rel attribute?
-                self._kev_storage.append(KengiEv(r[0], **r[1]))
+            if ev_pyved_repr:  # some events have been ignored/ filtered out
+                self._kev_storage.append(KengiEv(ev_pyved_repr[0], **ev_pyved_repr[1]))
 
+        del self._low_lvl_ev_buffer[:]
         return self._kev_storage
 
     # --- legit pyved functions
     def bootstrap_e(self):
-        self.low_level_service.fire_up_backend(0)  # TODO
-
         # TODO use mediator everythime ? instead of EvManager
         # self.mediator = None  # Mediator()
         # need to set it in variables other wise all actor-based games wont work

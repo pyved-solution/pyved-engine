@@ -10,7 +10,7 @@ class PygameWrapper(GESublayer):
         self.stored_size = [0, 0]
         self._stored_lambda = None
         self._is_scr_init = False
-        self.game_win_size = [0, 0]
+        self.gam_win_size = [0, 0]
         self.stored_upscaling = None  # when not init, afterwards it can never be None
         self.ref_realscreen = None
         self.gfx_offsets = [0, 0]
@@ -103,15 +103,6 @@ class PygameWrapper(GESublayer):
     def get_pressed(self):
         return self._pygame.key.get_pressed()
 
-    def set_mode(self, *args, **kwargs):
-        print('allumage --Pygame--')
-        self._pygame.display.set_mode(
-            # args[0]  # deprecated: back when the user was able to select scr size...
-            (1366, 768),
-            # (0, 0),
-            flags=self._pygame.RESIZABLE
-        )
-
     def new_surface_obj(self, size):
         return self._pygame.surface.Surface(size)
 
@@ -151,9 +142,10 @@ class PygameWrapper(GESublayer):
     def draw_circle(self, surface, color_arg, position2d, radius, width):
         self._pygame.draw.circle(surface, color_arg, position2d, radius, width)
 
-    def fire_up_backend(self, user_id: int) -> dict:
+    def fire_up_backend(self, user_id: int):
         # Example: Fetch data from a REST API
-        return {"user_id": user_id, "name": "Bob", "role": "User"}
+        # return {"user_id": user_id, "name": "Bob", "role": "User"}
+        self._pygame.display.set_mode((640, 480), self.RESIZABLE)  # no need to pass a realistic resolution now
 
     def draw_line(self, *args, **kwargs):
         self._pygame.draw.line(*args, **kwargs)
@@ -194,7 +186,7 @@ class PygameWrapper(GESublayer):
         if usf == 1:
             self.ref_realscreen.blit(self._vsurface, self.gfx_offsets)
         else:
-            target_size = (usf * self.game_win_size[0], usf * self.game_win_size[1])
+            target_size = (usf * self.gam_win_size[0], usf * self.gam_win_size[1])
             # coded at the sublayer level
             new_surf = self.transform.scale(
                 self._vsurface, target_size
@@ -202,53 +194,58 @@ class PygameWrapper(GESublayer):
             self.ref_realscreen.blit(new_surf, self.gfx_offsets)
         self.display.update()
 
-    def do_screen_param(self, lambda_factor, display_size, cached_paintev):
+    def do_screen_param(self, lambda_factor, total_disp_size, cached_paintev):
         """
         :param lambda_factor: in the range 1-4. Multiplier applied to 160x90 to comptute the game window (no upscaling)
-        :param display_size: how many pixels available on the screen e.g. 1920x1080
+        :param total_disp_size: how many pixels available on the screen e.g. 1920x1080
         :param cached_paintev: can be None or a pyved event that needs to have its .screen attribute set
 
         :returns:surface on which to draw
         """
+        if not isinstance(lambda_factor, int):
+            raise ValueError('invalid lamda factor!')
         if self._is_scr_init:
             raise RuntimeError('cannot init screen more than once!')
 
-        if not isinstance(lambda_factor, int):
-            raise ValueError('invalid lamda factor!')
+        # ensure screen is ready to do drawings
+        self.ref_realscreen = self.display.get_surface()
+        assert self.ref_realscreen is not None
+        assert total_disp_size == self.ref_realscreen.get_size()
+        self._is_scr_init = True
 
         self._stored_lambda = lambda_factor
-        self.adapt_window_size(display_size)
-
-        self._vsurface = vsurf = self.new_surface_obj(self.game_win_size)
-
+        self.adapt_window_size(total_disp_size)
+        self._vsurface = vsurf = self.new_surface_obj(self.gam_win_size)
         if vsurf is None:
             raise ValueError(
                 'something\'s really off with screen surface initialization (vscreen.do_screen_param func)')
 
         if cached_paintev:
             cached_paintev.screen = vsurf
-
-        self.ref_realscreen = self.display.get_surface()
-        assert self.ref_realscreen is not None
-        assert self.ref_realscreen.get_size() == display_size
-        self._is_scr_init = True
         return vsurf
 
     def adapt_window_size(self, new_w_size):
         newval_w, newval_h = new_w_size
 
-        self.game_win_size[0], self.game_win_size[1] = 160 * self._stored_lambda, 90 * self._stored_lambda
+        self.gam_win_size[0], self.gam_win_size[1] = 160 * self._stored_lambda, 90 * self._stored_lambda
         prev_k_factor = 1
         k_candidate = 2
-        GWW, GWH = self.game_win_size
+        GWW, GWH = self.gam_win_size
         while (k_candidate * GWW) < newval_w + 1 and (k_candidate * GWH) < newval_h + 1:
             prev_k_factor = k_candidate
             k_candidate += 1
         self._upscaling_val = ups = prev_k_factor
         disp_w, disp_h = new_w_size
-        print(f'lambda={self._stored_lambda}  ; CALC Window {self.game_win_size}:upscale={ups}:offsets={self.gfx_offsets}')
+        print(f'lambda={self._stored_lambda}; CALC Window {self.gam_win_size}:upscale={ups}:offsets={self.gfx_offsets}')
         widget_s = [ups * GWW, ups * GWH]
+
         self.gfx_offsets[0], self.gfx_offsets[1] = (disp_w - widget_s[0]) // 2, (disp_h - widget_s[1]) // 2
+
+        # via la ligne ci-dessous,
+        # VOLONTAIREMENT, je casse le centrage, pour que ce soit plus simple d'obtenir le résulat equivalent au Local,
+        # mais dans le WebCtx (simplification BIENVENUE, dans un 1er temps...)
+        self.gfx_offsets = [0, 0]
+        # -----------------------
 
     def is_fullscreen(self):
         return self.fullscreen_flag

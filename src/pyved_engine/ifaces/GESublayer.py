@@ -26,31 +26,14 @@ class GESublayer(ABC):
        two modules mentionned above)
     """
     @abstractmethod
-    def init(self):  # pygame initialization
+    def init(self):  # sublayer/backend initialization
         pass
 
-    @abstractmethod
-    def quit(self):  # pygame initialization
-        pass
-
-    @abstractmethod
-    def init_sound(self):
-        pass
+    def quit(self):
+        pass  # its basically to flush memory/reset the lower layer state
 
     @abstractmethod
     def get_pressed(self):
-        pass
-
-    @abstractmethod
-    def set_mode(self, *args, **kwargs):
-        pass
-
-    @abstractmethod
-    def sound_quit(self):
-        pass
-
-    @abstractmethod
-    def set_caption(self, txt: str, icon_title=''):
         pass
 
     @abstractmethod
@@ -59,11 +42,11 @@ class GESublayer(ABC):
         pass
 
     @abstractmethod
-    def draw_line(self, *args, **kwargs):
+    def draw_circle(self, surface, color_arg, position2d, radius, width):
         pass
 
     @abstractmethod
-    def draw_rect(self, *args, **kwargs):
+    def draw_line(self, *args, **kwargs):
         pass
 
     @abstractmethod
@@ -71,7 +54,15 @@ class GESublayer(ABC):
         pass
 
     @abstractmethod
-    def draw_circle(self, surface, color_arg, position2d, radius, width):
+    def draw_rect(self, *args, **kwargs):
+        pass
+
+    @abstractmethod
+    def init_sound(self):
+        pass
+
+    @abstractmethod
+    def sound_quit(self):
         pass
 
     @abstractmethod

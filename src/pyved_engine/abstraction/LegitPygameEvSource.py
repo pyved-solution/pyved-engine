@@ -35,7 +35,7 @@ class LegitPygameEvSource(DeepEvSource):
 
         self._pygame_mod = _genuine_pyg
         self.debug_mode = False
-        self._ev_storage = list()
+
         self.pyg_jm = None  # model for joystickS
         self.lstick_val_cache = [0.0, 0.0]
         self.rstick_val_cache = [0.0, 0.0]
@@ -50,7 +50,5 @@ class LegitPygameEvSource(DeepEvSource):
     def joystick_count(self):
         return self._pygame_mod.joystick.get_count()
 
-    def fetch_raw_events(self):
-        del self._ev_storage[:]
-        self._ev_storage.extend(self._pygame_mod.event.get())
-        return self._ev_storage
+    def upload_raw_events(self, buffer_li):
+        buffer_li.extend(self._pygame_mod.event.get())

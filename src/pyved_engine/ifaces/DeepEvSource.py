@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 
 class DeepEvSource(ABC):
     @abstractmethod
-    def fetch_raw_events(self):
+    def upload_raw_events(self, buffer_li):
         pass
 
     @abstractmethod
