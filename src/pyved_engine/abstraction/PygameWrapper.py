@@ -6,9 +6,9 @@ class PygameWrapper(GESublayer):
     (Step 2) Implementing the GESublayer interface, via a concrete pygame-based class
     """
     def __init__(self):
+        super().__init__()
         # manage upscaling etc
         self.stored_size = [0, 0]
-        self._stored_lambda = None
         self._is_scr_init = False
         self.gam_win_size = [0, 0]
         self.stored_upscaling = None  # when not init, afterwards it can never be None
@@ -18,6 +18,8 @@ class PygameWrapper(GESublayer):
         self._vsurface = None
         self._vsurface_required = False
         self.fullscreen_flag = False
+
+        self.first_fullscreen_change = True
 
         import pygame
 
@@ -43,6 +45,8 @@ class PygameWrapper(GESublayer):
         self.mouse = self._pygame.mouse
 
         # copy many pygame constants
+        self.USEREVENT = self._pygame.USEREVENT
+
         self.SRCALPHA = self._pygame.SRCALPHA
         self.RLEACCEL = self._pygame.RLEACCEL
         self.VIDEORESIZE = self._pygame.VIDEORESIZE
@@ -213,7 +217,7 @@ class PygameWrapper(GESublayer):
         assert total_disp_size == self.ref_realscreen.get_size()
         self._is_scr_init = True
 
-        self._stored_lambda = lambda_factor
+        self._set_lambda(lambda_factor)
         self.adapt_window_size(total_disp_size)
         self._vsurface = vsurf = self.new_surface_obj(self.gam_win_size)
         if vsurf is None:
@@ -225,22 +229,11 @@ class PygameWrapper(GESublayer):
         return vsurf
 
     def adapt_window_size(self, new_w_size):
-        newval_w, newval_h = new_w_size
+        y, offx, offy = self._compute_viewport_param_vector(new_w_size)  # returns drawing size w,h then the upscaling
 
-        self.gam_win_size[0], self.gam_win_size[1] = 160 * self._stored_lambda, 90 * self._stored_lambda
-        prev_k_factor = 1
-        k_candidate = 2
-        GWW, GWH = self.gam_win_size
-        while (k_candidate * GWW) < newval_w + 1 and (k_candidate * GWH) < newval_h + 1:
-            prev_k_factor = k_candidate
-            k_candidate += 1
-        self._upscaling_val = ups = prev_k_factor
-        disp_w, disp_h = new_w_size
-        print(f'lambda={self._stored_lambda}; CALC Window {self.gam_win_size}:upscale={ups}:offsets={self.gfx_offsets}')
-        widget_s = [ups * GWW, ups * GWH]
-
-        self.gfx_offsets[0], self.gfx_offsets[1] = (disp_w - widget_s[0]) // 2, (disp_h - widget_s[1]) // 2
-
+        self._upscaling_val = y
+        self.gfx_offsets[0] = offx
+        self.gfx_offsets[1] = offy
         # via la ligne ci-dessous,
         # VOLONTAIREMENT, je casse le centrage, pour que ce soit plus simple d'obtenir le résulat equivalent au Local,
         # mais dans le WebCtx (simplification BIENVENUE, dans un 1er temps...)
@@ -251,16 +244,23 @@ class PygameWrapper(GESublayer):
         return self.fullscreen_flag
 
     def exit_fullscreen(self):
+        print('fullscreen (pygamewrappen): OFF')
         self.fullscreen_flag = False
-        self.display.set_mode(self.stored_size, self._pygame.RESIZABLE)
-        self.adapt_window_size(self.stored_size)
+        self.ref_realscreen = self.display.set_mode(self.stored_size, self._pygame.RESIZABLE)
+        #self.ref_realscreen.fill('black')
+        self._vsurface.fill('black')
+        # resize logic will be called after a .resize event has been raised
+        #self.adapt_window_size(self.stored_size)
 
     def enter_fullscreen(self):
+        print('fullscreen (pygamewrappen): ON')
         self.fullscreen_flag = True
         self.stored_size = self.ref_realscreen.get_size()
-        disp = self.display.set_mode((0, 0), self._pygame.FULLSCREEN)
-        self.adapt_window_size(disp.get_size())
-
+        self.ref_realscreen = d = self.display.set_mode((0, 0), self._pygame.FULLSCREEN)
+        #self.ref_realscreen.fill('black')
+        if self.first_fullscreen_change:  # pygame quirks: why the .RESIZE event is not sent the first time? no idea
+            self.adapt_window_size(d.get_size())
+        self.first_fullscreen_change = False
 
 # class WebGlBackendBridge(GameEngineSublayer):
 #     def fire_up_backend(self, user_id: int) -> dict:

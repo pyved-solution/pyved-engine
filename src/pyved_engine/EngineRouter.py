@@ -123,14 +123,13 @@ class EngineRouter:
     def get_version():
         return pe_vars.ENGINE_VERSION_STR
 
-    def init(self, lambda_factor: int, maxfps=None, wcaption=None, forced_size=None, cached_paint_ev=None,
+    def init(self, lambda_factor: int, maxfps=None, forced_size=None, cached_paint_ev=None,
              multistate_info=None) -> None:
         """
         CAREFUL it is not the constructor, this is the engine router init func!
 
         :param lambda_factor: or L, it tells the game engine many pixels we want, to draw our game. L *(160x90)
         :param maxfps:
-        :param wcaption:
         :param forced_size:
         :param cached_paint_ev:
         :param multistate_info:
@@ -140,7 +139,7 @@ class EngineRouter:
         print(self.low_level_service.K_F11)
         if self.ready_flag:
             return
-        event_source = second_phase_init(self.low_level_service, self.event_src_class, maxfps, wcaption)
+        event_source = second_phase_init(self.low_level_service, self.event_src_class, maxfps)
 
         self.ev_source = event_source
         self.low_level_service.fire_up_backend(lambda_factor)
@@ -247,26 +246,33 @@ class EngineRouter:
         for pyev in self._low_lvl_ev_buffer:
             ev_pyved_repr = None
 
-            if pyev.type == self.low_level_service.VIDEORESIZE:
-                # print('-->detection au niveau EngineRoute event resize')
-                self.adapt_window_size(pyev.size)
-                if self.low_level_service.is_fullscreen():
-                    self.low_level_service.fullscreen_flag = False
-                    print('forced update of the fullscreen_flag!')
-
-            elif hasattr(pyev, 'key') and pyev.key == self.low_level_service.K_F11:  # F11 interaction
+            if hasattr(pyev, 'key') and pyev.key == self.low_level_service.K_F11:  # F11 interaction
                 if pyev.type == 768:  # keydown
                     if not self.low_level_service.is_fullscreen():
                         self.low_level_service.enter_fullscreen()
-                    else:
-                        self.low_level_service.exit_fullscreen()  # in fact, this will only be called in local ctx
+                    else:  # this will only be called in local ctx as web ctx has a bug not forwarding F11
+                        self.low_level_service.exit_fullscreen()
 
-            elif hasattr(pyev, 'key') and pyev.key == self.low_level_service.K_ESCAPE:
-                if pyev.type == 768 and self.low_level_service.is_fullscreen():
+            elif pyev.type == self.low_level_service.USEREVENT:
+                # fullscreen management hack, tied to web
+                if pyev.code == 0xFF and pyev.exit_flag:  # see the alien "overlay" module
+                    # will be called in web ctx only
                     self.low_level_service.exit_fullscreen()
-                else:
-                    # also: need to forward informations about the escape key
-                    ev_pyved_repr = (self._map_etype2kengi(pyev.type), pyev.dict)
+
+            elif pyev.type == self.low_level_service.VIDEORESIZE:
+                # print('-->detection au niveau EngineRoute event resize')
+                print('newsize:', pyev.size)
+                self.adapt_window_size(pyev.size)
+                #if self.low_level_service.is_fullscreen():
+                #    self.low_level_service.fullscreen_flag = False
+                #    print('Fullscreen_flag forcing to False!')
+
+            # elif hasattr(pyev, 'key') and pyev.key == self.low_level_service.K_ESCAPE:
+            #     if pyev.type == 768 and self.low_level_service.is_fullscreen():
+            #         self.low_level_service.exit_fullscreen()
+            #     else:
+            #         # also: need to forward informations about the escape key
+            #         ev_pyved_repr = (self._map_etype2kengi(pyev.type), pyev.dict)
 
             # -----------------------------
             #   convenient gamepad support
@@ -441,6 +447,7 @@ class EngineRouter:
         if self._storage:  # need to test bc if no assets preloaded, this is None
             self._storage.flush_mem()
         self.low_level_service.quit()
+        self.ready_flag = False  # important so we can redo pyv.init again when a 2nd game is loaded after vmboot
 
     def surface_create(self, size):
         return self.low_level_service.new_surface_obj(size)
@@ -486,7 +493,7 @@ _scr_init_flag = False
 
 
 # --- rest of functions ---
-def second_phase_init(lower_level_svc, event_source_cls, maxfps=None, wcaption=None):
+def second_phase_init(lower_level_svc, event_source_cls, maxfps=None):
     global _engine_rdy
     # TODO check when to use mediator
     if maxfps is None:
@@ -555,8 +562,7 @@ def second_phase_init(lower_level_svc, event_source_cls, maxfps=None, wcaption=N
     EvManager.instance().a_event_source = oneof_pyv_backend
 
     lower_level_svc.init()
-    if wcaption:
-        lower_level_svc.set_caption(wcaption)
+
     _engine_rdy = True
 
     return oneof_pyv_backend  # returns a engine-compatible event source
