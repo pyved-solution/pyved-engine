@@ -1,4 +1,7 @@
 # add-on
+output.svg
+tach.toml
+tach_module_graph.dot
 .idea/
 site/
 
