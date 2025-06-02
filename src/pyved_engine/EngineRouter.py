@@ -23,7 +23,7 @@ from . import hub
 from . import state_management
 from .AssetsStorage import AssetsStorage
 from .abstraction.EvSystem import EngineEvTypes, EvListener, Emitter, EvManager
-from .abstraction.LegitPygameEvSource import LegitPygameEvSource
+from .cd_patterns import CustomizableCode, inj_dependencies
 from .concr_engin import core
 from .concr_engin import pe_vars
 from .concr_engin.pe_vars import KengiEv
@@ -44,26 +44,42 @@ class CodesProxy:
         print(f'[WARNING] Cant find keycode {item} in sublayer compo')
 
 
-class EngineRouter:
+class EngineRouter(CustomizableCode):
     """this is basicaly a merged interface to expose high-level functions to the game dev,
     it will be initialized at runtime,
     before loading a game cartridge so the game dev hasn't to worry about that step"""
 
-    # constants that help with engine initialization
-    HIGH_RES_MODE, LOW_RES_MODE, RETRO_MODE = 1, 2, 3
-
     # Step 3: Inject the dependency
-    def __init__(self, sublayer_compo, event_src_class=None):
-        # TODO injection to do elsewhere. At module lvl, no? Could be more convenient
+    def __init__(self):
+        # set the default behavior, if a specific behavior hasn't been set from outside
+        if self.is_vanilla():
+            cls_name = self.__class__.__name__
+            print(f'->{cls_name} cls, using its default behavior')
+            from .abstraction.PygameWrapper import PygameWrapper
+            from .abstraction.LegitPygameEvSource import LegitPygameEvSource
+            inj_dependencies(EngineRouter,
+                             sublayer=PygameWrapper,
+                             ev_source=LegitPygameEvSource
+                             )
+        self.instantiate_dependencies(  # do tho dep. injection (bulk)
+            sublayer_kwargs={},
+            ev_source_kwargs={'ev_types_atlas': EngineEvTypes}
+        )
+
+        self._metadata = dict()
+        self.netlayer = None  # in case the game is multiplayer, this will be used for network comms
+        # value: injected from outside, that is from: launch_game/launch_vm
 
         # sublayer_compo has to be follow the "GESublayer" interface (GESublayer=fully abstract class)
         self.bypass_event_type_checking = False
-        core.set_sublayer(sublayer_compo)
-        if event_src_class:
-            self.event_src_class = event_src_class  # a class that inherits from DeepEvSource
-        else:
-            self.event_src_class = LegitPygameEvSource
         core.save_engine_ref(self)
+        core.set_sublayer(self.sublayer)
+        self.low_level_service = self.sublayer
+
+        # if event_src_class:
+        #    self.event_src_class = event_src_class  # a class that inherits from DeepEvSource
+        # else:
+        #    self.event_src_class = LegitPygameEvSource
 
         # - Below: A neat trick to make our engine compatbile with web ctx.
         # These ar for storing refs on py functions defined in a game cartridge:
@@ -71,21 +87,20 @@ class EngineRouter:
 
         # - reste of recent attributes
         self.server_flag = False
-        self.low_level_service = sublayer_compo
-
         self.assets_loaded = False
         self._storage = None  # will be instantiated once we call preload_assets
         self.debug_mode = False
         self.ready_flag = False
         # immediate bind
+        from .umediator import netlayer_factory
         self._hub = {
             'SpriteGroup': self.low_level_service.sprite.Group,
             'Sprite': self.low_level_service.sprite.Sprite,
-            'sprite_collision': self.low_level_service.sprite.spritecollide
+            'sprite_collision': self.low_level_service.sprite.spritecollide,
+            'netlayer_factory': netlayer_factory
         }
-        self.ev_source = None
-        hub.engine_ref = self
 
+        hub.engine_ref = self
         self._low_lvl_ev_buffer = list()
         # just a queue for storing events
         self._kev_storage = list()  # kev because KENGI events =high-level, not using pygame ev codes
@@ -99,12 +114,21 @@ class EngineRouter:
     def play_sound(self, name, repeat=0):
         self._storage.sounds[name].play(repeat)
 
+    def get_metadata_val(self, specified_k):
+        if specified_k in self._metadata:
+            return self._metadata[specified_k]
+        print(f"[EngineRouter] Warning! trying to read {specified_k} on metadat, not found")
+        return None
+
     def preload_assets(self, metadat_dict, prefix_asset_folder=None, prefix_sound_folder=None):
+        self._metadata.update(metadat_dict)  # overwrite existing values
+
         print('***** modern pre-loading *******')
         self._storage = AssetsStorage(
             self.low_level_service, self._hub['gfx'],
             metadat_dict, prefix_asset_folder, prefix_sound_folder
         )
+
         print('engine status: assets are now available')
         # late bind
         self._hub.update({
@@ -139,9 +163,8 @@ class EngineRouter:
         print(self.low_level_service.K_F11)
         if self.ready_flag:
             return
-        event_source = second_phase_init(self.low_level_service, self.event_src_class, maxfps)
+        second_phase_init(self.low_level_service, self.ev_source, maxfps)
 
-        self.ev_source = event_source
         self.low_level_service.fire_up_backend(lambda_factor)
         print('>>>fire_up_backend done')
 
@@ -263,7 +286,7 @@ class EngineRouter:
                 # print('-->detection au niveau EngineRoute event resize')
                 print('newsize:', pyev.size)
                 self.adapt_window_size(pyev.size)
-                #if self.low_level_service.is_fullscreen():
+                # if self.low_level_service.is_fullscreen():
                 #    self.low_level_service.fullscreen_flag = False
                 #    print('Fullscreen_flag forcing to False!')
 
@@ -347,7 +370,6 @@ class EngineRouter:
         from .concr_engin import pe_vars as _vars
         from .abstraction.EvSystem import game_events_enum
         from .creep import actors_pattern
-        from . import defs
         from .patterns import ecs
         from .looparts import rogue
         from . import umediator
@@ -356,7 +378,7 @@ class EngineRouter:
             'ecs': ecs,
             'rogue': rogue,
             'states': state_management,
-            'defs': defs,
+            'defs': _vars,
             'gfx': gfx,
             'actors': actors_pattern,
             'game_events_enum': game_events_enum,
@@ -401,9 +423,13 @@ class EngineRouter:
     # [a hack for using pyv.umediator]
     # this is handy to replace the default mediator by the modern/more powerful one
     def use_mediator(self, ref_evomed):
-        self.bypass_event_type_checking = True
-        pe_vars.mediator = ref_evomed
-        print('>>PYVED: Now using the experimental Umediator Obj<<')
+        if self.netlayer is None:
+            raise RuntimeError('need to specify pyv.netlayer before you can use the Umediator class')
+        else:
+            ref_evomed.set_network_layer(self.netlayer)
+            self.bypass_event_type_checking = True
+            pe_vars.mediator = ref_evomed
+            print('>>PYVED is now using the experimental Umediator class<<')
 
     def post_ev(self, evtype, **ev_raw_data):
         if self.debug_mode:
@@ -493,7 +519,7 @@ _scr_init_flag = False
 
 
 # --- rest of functions ---
-def second_phase_init(lower_level_svc, event_source_cls, maxfps=None):
+def second_phase_init(lower_level_svc, event_source_obj, maxfps=None):
     global _engine_rdy
     # TODO check when to use mediator
     if maxfps is None:
@@ -509,14 +535,15 @@ def second_phase_init(lower_level_svc, event_source_cls, maxfps=None):
     # _pyv_backend = abstraction.build_primalbackend(pe_vars.backend_name)
     # (SIDE-EFFECT: Building the backend also sets kengi_inj.pygame )
 
+    # - this is now done in __init__ of EngineRouter!
     # TODO one item in the long sequence of dep. injections is to be found there:
     #  check where to put the rest
-    oneof_pyv_backend = event_source_cls(
-        pe_vars.engine_events  # we have to pass:
-        # our custom engine's all event types --> to the DeepEventSource we're instantiating,
-        # in this way, the DeepEvSource will be able to map its own event codes to PyvedEngine event codes ...
-        # tricky but this does work (May25)
-    )
+    # oneof_pyv_backend = event_source_cls(
+    #    pe_vars.engine_events  # we have to pass:
+    # our custom engine's all event types --> to the DeepEventSource we're instantiating,
+    # in this way, the DeepEvSource will be able to map its own event codes to PyvedEngine event codes ...
+    # tricky but this does work (May25)
+    # )
 
     # pbe_identifier: str / values accepted -> to make a valid func. call you would either pass '' or 'web'
     # libbundle_ver: str
@@ -559,13 +586,11 @@ def second_phase_init(lower_level_svc, event_source_cls, maxfps=None):
 
     # CAREFUL: if you dont call the line below,
     # the high level event system wont work (program hanging)
-    EvManager.instance().a_event_source = oneof_pyv_backend
+    EvManager.instance().a_event_source = event_source_obj  # oneof_pyv_backend
 
     lower_level_svc.init()
 
     _engine_rdy = True
-
-    return oneof_pyv_backend  # returns a engine-compatible event source
 
 
 _existing_game_ctrl = None

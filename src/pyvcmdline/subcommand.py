@@ -320,8 +320,8 @@ def serve(bundle_name, **kwargs) -> None:
         serv_glvars_module_desc = '.'.join((MODULE_WITH_SERV_CODE, 'shared_code', 'glvars'))
         mvars = importlib.import_module(serv_glvars_module_desc)
         from pyved_engine.EngineRouter import EngineRouter
-        from pyved_engine.abstraction.PygameWrapper import PygameWrapper
-        mvars.pyv = EngineRouter(PygameWrapper())  # dependency injection
+
+        mvars.pyv = EngineRouter()
         mvars.pyv.bootstrap_e()
         module_basename, ext = os.path.splitext(SCRIPT_WITH_SERV_CODE)
         file_to_start_server = '.'.join((MODULE_WITH_SERV_CODE, module_basename))
@@ -349,11 +349,15 @@ def share(bundle_name: str, dev_flag: bool):
     #  we may want to create a 'pack' subcommand that would only produce the .zip, not send it elsewhere
     # that pack subcommand would pack and send it to the cwd, whereas the classic pack uses the tempfile/tempdir logic
 
-    # - refresh list of files
-    metadat = _utils.read_metadata(bundle_name)
-    _utils.save_list_of_py_files(os.path.join(bundle_name, 'cartridge'), metadat)
-    rewrite_metadata(bundle_name, metadat)
+    # - BOLLOKCS its a bad idea to do this. Plus for unknown reasons it may bump the pyv versions,
+    # =side effects
 
+    # deprec:refresh list of files
+    # metadat = _utils.read_metadata(bundle_name)
+    # _utils.save_list_of_py_files(os.path.join(bundle_name, 'cartridge'), metadat)
+    # rewrite_metadata(bundle_name, metadat)
+
+    metadat = _utils.read_metadata(bundle_name)
     slug = metadat['slug']
     if dev_flag:  # in devmode, all tests on metadata are skipped
         zipfile_path = pack_game_cartridge(slug)

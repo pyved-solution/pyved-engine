@@ -1,6 +1,7 @@
 import importlib
 import json
 import os
+import sys
 
 
 bundle_name, game_glvars, pyved_engine_alias = None, None, 'pyved_engine'
@@ -32,6 +33,12 @@ def prep_libs(cb_func, rel_import_flag, plugins_list):
 
 # boot_game func relies on that implementation
 def game_execution(metadata, gdef_module, **kwargs):
+    """
+    :param metadata:
+    :param gdef_module:
+    :param kwargs: will be passed "as is" to the game-specific gamedef.init function
+    :return:
+    """
     global game_glvars, pyved_engine_alias
 
     def find_folder(givenfolder, start_path):
@@ -56,6 +63,13 @@ def game_execution(metadata, gdef_module, **kwargs):
         prefix_asset_folder=adhoc_folder + os.sep + metadata['asset_base_folder'] + os.sep,
         prefix_sound_folder=adhoc_folder + os.sep + metadata['sound_base_folder'] + os.sep
     )
+    # if the game is multiplayer, we need to instantiate a netlayer
+    # init network comms, create a model, and force sync it
+    if metadata['multiplayer']:
+        if 'mode' not in kwargs:
+            raise ValueError('for multiplayer game, "mode" HAS TO be either specify in metadat>kwargs or via cmd line')
+        pyv.netlayer = pyv.netlayer_factory.build_netlayer(kwargs['mode'], 'client')
+
     pyv.run_game(
         getattr(gdef_module, 'init'),
         getattr(gdef_module, 'update'),
@@ -63,10 +77,8 @@ def game_execution(metadata, gdef_module, **kwargs):
         **kwargs
     )
 
-import sys
 
-
-def boot_game(mdata_path, **kwargs):
+def boot_game(mdata_path, **cli_kwargs):
     print('------mdata_path=', mdata_path)
 
     global bundle_name, game_glvars
@@ -109,4 +121,13 @@ def boot_game(mdata_path, **kwargs):
         gamedef = importlib.import_module(module_name)
         # old:
         # gamedef = importlib.import_module('gamedef', pck_name)
-        game_execution(metadata, gamedef, **kwargs)
+
+        synth_kwargs = metadata['kwargs']  # using what is in file, but can be overwritten via line cmd
+
+        for gk, val in cli_kwargs.items():  # print warnings
+            if gk in synth_kwargs:
+                print(' *warning* ', gk, 'value found in metadat.json gets replaced by the value passed via pyv-cli:',
+                      cli_kwargs[gk]
+                      )
+        synth_kwargs.update(cli_kwargs)
+        game_execution(metadata, gamedef, **synth_kwargs)

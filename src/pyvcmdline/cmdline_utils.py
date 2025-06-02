@@ -94,6 +94,8 @@ def check_type(value, expected_type):
         return True
     elif expected_type == "list" and isinstance(value, list):
         return True
+    elif expected_type == "dict" and isinstance(value, dict):
+        return True
     return False
 
 

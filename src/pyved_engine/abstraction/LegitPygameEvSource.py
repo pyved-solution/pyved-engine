@@ -4,7 +4,7 @@ from ..concr_engin.pe_vars import KengiEv
 
 class LegitPygameEvSource(DeepEvSource):
 
-    def __init__(self, EngineEvTypes):
+    def __init__(self, ev_types_atlas):  # EngineEvTypes):
         import pygame as _genuine_pyg
 
         self.joy_bt_map = {

@@ -1,36 +1,19 @@
 """
-Classe qui aide à etre très flexible niveau communications réseau.
-On peut switcher facilement d'une interface à l'autre en la construisant
-à la demande, en passant deux arguments à savoir:
+Class to provide high flexibility in network communications.
 
- Contexte , client/server
+It allows for easy switching between different interfaces by constructing
+the appropriate one on demand. This is achieved by passing two arguments:
 
+- Context: Game with both client and server components
 """
 import importlib
 
 
 __all__ = [
-    'build_net_layer',
+    'build_netlayer',
+    'build_netlayer_from_module',
     'Objectifier'
 ]
-
-
-"""
-Define a mapping of parameter pairs to module names
-
- ... Feel free to add more mappings as needed
-"""
-netw_strat_table = {
-    ('socket', 'client'): 'netw_socket_cli',
-    ('socket', 'server'): 'netw_socket_server',
-    ('ws', 'client'): 'netw_ws_client',
-    ('ws', 'server'): 'netw_ws_serv',
-}
-
-# tmp = tuple(netw_strat_table.keys())
-# prefx = '.netw_strategies.'
-# for k in tmp:
-#     netw_strat_table[k] = prefx+netw_strat_table[k]
 
 
 class Objectifier:
@@ -38,7 +21,24 @@ class Objectifier:
         self.__dict__.update(entries)
 
 
-def build_net_layer(param1, param2) -> dict:
+def build_netlayer_from_module(pymod):
+    # Extract the functions
+    f1 = getattr(pymod, 'get_server_flag')
+    f2 = getattr(pymod, 'start_comms')
+    f3 = getattr(pymod, 'broadcast')
+    f4 = getattr(pymod, 'register_mediator')
+    f5 = getattr(pymod, 'shutdown_comms')
+    dict_repr_netlayer = {
+        'get_server_flag': f1,
+        'start_comms': f2,
+        'broadcast': f3,
+        'register_mediator': f4,
+        'shutdown_comms': f5
+    }
+    return Objectifier(**dict_repr_netlayer)
+
+
+def build_netlayer(param1, param2):
     """
     Helps retrieving functions from a particular netw_* module,
     based on the two given parameters.
@@ -46,31 +46,23 @@ def build_net_layer(param1, param2) -> dict:
     :param param2: either 'client' or 'server', nothing else
     :return: a dictionary of functions
     """
-    print('dans build_net_layer', param1, param2)
+    print('internal PYV init step:<build_netlayer Func>, params:', param1, param2)
 
-    module_name = netw_strat_table.get((param1, param2))
-    if not module_name:
-        raise ValueError(f"No module found for parameters: {param1}, {param2}")
-
-    # Import the module dynamically
-    module = importlib.import_module('.netw_strategies.'+module_name, package='pyved_engine.umediator')
-
-    # Extract the functions
-    f1 = getattr(module, 'get_server_flag')
-    f2 = getattr(module, 'start_comms')
-    f3 = getattr(module, 'broadcast')
-    f4 = getattr(module, 'register_mediator')
-    f5 = getattr(module, 'shutdown_comms')
-
-    return {
-        'get_server_flag': f1,
-        'start_comms': f2,
-        'broadcast': f3,
-        'register_mediator': f4,
-        'shutdown_comms': f5
+    # mapping of parameter pairs -to-> module names
+    # Feel free to add more items, if needed
+    netw_strat_table = {
+        ('socket', 'client'): 'netw_socket_cli',
+        ('socket', 'server'): 'netw_socket_server',
+        ('ws', 'client'): 'netw_ws_client',
+        ('ws', 'server'): 'netw_ws_serv',
     }
 
-# -- just testing
-# truc = Objectifier(**build('socket', 'server'))
-# print(truc.broadcast)
-# print(truc.get_server_flag())
+    # Import the ad-hoc module dynamically, then build a netlayer from it
+    module_name = netw_strat_table.get((param1, param2))
+    if not module_name:
+        raise ValueError(f"No transport layer definition module suitable for params: {param1},{param2}")
+
+    resulting_netlayer = build_netlayer_from_module(
+        importlib.import_module('.netw_strategies.'+module_name, package='pyved_engine.umediator')
+    )
+    return resulting_netlayer

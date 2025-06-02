@@ -24,9 +24,6 @@
         "type": "list",
         "items_type": "str"
     },
-    "vmlib_ver": {
-        "type": "str"
-    },
     "author": {
         "type": "str"
     },
@@ -58,6 +55,9 @@
         "type": "list",
         "items_type": "str"
     },
+    "kwargs": {
+        "type": "dict"
+    },
     "uses_challenge": {
         "type": "bool"
     },
@@ -65,6 +65,9 @@
         "type": "bool"
     },
     "ncr_faucet": {
+        "type": "bool"
+    },
+    "multiplayer": {
         "type": "bool"
     },
     "game_genre": {

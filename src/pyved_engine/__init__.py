@@ -11,7 +11,7 @@ from . import hub
 from .EngineRouter import EngineRouter
 from .abstraction.EvSystem import Emitter, EvListener, EngineEvTypes
 from .compo.GameTpl import GameTpl  # legacy class
-from .concr_engin import pe_vars as defs
+from .concr_engin import pe_vars
 
 # you can activate the lines below
 # from . import evsys0
@@ -25,7 +25,6 @@ from .concr_engin import pe_vars as defs
 
 _stored_kbackend = None
 _context_type = 'local'
-_router_singleton = None
 _stored_ev_source_cls = None
 
 
@@ -42,18 +41,21 @@ def set_exec_context(context_type: str, binding=None, stored_cls=None):
         _stored_ev_source_cls = stored_cls
 
 
+def set_engine_ref(x):
+    pe_vars.router_singleton = x
+
+
 def get_engine_router() -> EngineRouter:
     """
     :return: the unique instance of EngineRouter class
     """
-    global _router_singleton
-    if _router_singleton:
-        return _router_singleton
+    if pe_vars.router_singleton:
+        return pe_vars.router_singleton
     from .EngineRouter import EngineRouter
-    if 'local' == _context_type:
-        from .abstraction.PygameWrapper import PygameWrapper
-        xcls = PygameWrapper
-    else:
-        xcls = _stored_kbackend
-    y = _router_singleton = EngineRouter(xcls(), _stored_ev_source_cls)
+    # if 'local' == _context_type:
+    #     from .abstraction.PygameWrapper import PygameWrapper
+    #     xcls = PygameWrapper
+    # else:
+    #     xcls = _stored_kbackend
+    y = pe_vars.router_singleton = EngineRouter()
     return y

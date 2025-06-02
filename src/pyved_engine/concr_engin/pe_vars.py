@@ -19,21 +19,21 @@ kengi.event... That is:
 import re
 
 
-# DECLARE CONSTANTS
-# in regard to display options, within KENGI there are only 4 canonical modes for display:
-#  three that are displayed in a 960 x 720 -pixel canvas
-# 'super_retro' (upscaling x3), 'old_school', (upscaling x2), 'hd' (no upscaling)
-# one that is displayed in a user-defined size canvas and also uses a pixel-to-pixel mapping just like the 'hd' option
-# from pyved_engine.custom_struct import Objectifier
+# CONSTANTS
+ENGINE_VERSION_STR = '25.4a1'  # should be readable via pyv.get_version()
+DATA_FT_SIZE = 16
+BASE_ENGINE_EVS = [
+    'update', 'draw',
+    'mousemotion', 'mouseup', 'mousedown',
+    'keyup', 'keydown', 'gameover',
+    'conv_begins', 'conv_step', 'conv_finish',  # conversations with npcs
+]
+_TRADITIONAL_1ST_ETYPE = 32866+1  # 32866 == pygame.USEREVENT
 
-# below is a read-only value,
-# to retrieve this value from outside you can call pyv.get_version()
-ENGINE_VERSION_STR = '25.4a1'
 
 # TODO ensure all errors have been removed,
 #  as this is deprecated
 # STD_SCR_SIZE = (960, 720)
-
 # USEREVENT = 32850  # pygame userevent 2.1.1
 # FIRST_ENGIN_TYPE = USEREVENT + 1
 # FIRST_CUSTO_TYPE = FIRST_ENGIN_TYPE + 20  # therefore, 20 is the maximal amount of engine events
@@ -150,46 +150,37 @@ class Singleton:
 
 
 # --- declare all engine events ---
-_TRADITIONAL_1ST_ETYPE = 32866+1  # 32866 == pygame.USEREVENT
-
-
 EngineEvTypes = PseudoEnum((
-    'Quit',
     'Activation',
+    'BasicTextinput',
+    # three events below are used in RPGs, such as: niobepolis, etc. Conv means conversation.
+    'ConvFinish',
+    'ConvStart',  # contains convo_obj, portrait
+    'ConvStep',  # contains value
+
     'FocusGained',
     'FocusLost',
-    'BasicTextinput',
-
-    'Keydown',
-    'Keyup',
-    'Mousemotion',
-    'Mousedown',
-    'Mouseup',
-
-    'Stickmotion',  # has event.axis; event.value
+    'Gameover',
     'GamepadDir',
     'Gamepaddown',
     'Gamepadup',
-
-    'Update',
-    'Paint',
-
     'Gamestart',
-    'Gameover',
-    # (used in RPGs like niobepolis, conv<- conversation)
-    'ConvStart',  # contains convo_obj, portrait
-    'ConvFinish',
-    'ConvStep',  # contains value
-
-    'StateChange',  # contains code state_ident
-    'StatePush',  # contains code state_ident
-    'StatePop',
-
-    'RpcReceive',  # two-level reception (->tunelling if we use the json-rpc). Has num and raw_rpc_resp attributes
-    'RpcError',  # contains: code, msg
-
-    'NetwSend',  # [num] un N°identification & [msg] un string (Async network comms)
+    'Keydown',
+    'Keyup',
+    'Mousedown',
+    'Mousemotion',
+    'Mouseup',
     'NetwReceive'  # [num] un N°identification & [msg] un string (Async network comms)
+    'NetwSend',  # [num] un N°identification & [msg] un string (Async network comms)
+    'Paint',
+    'Quit',
+    'RpcError',  # contains: code, msg
+    'RpcReceive',  # two-level reception (->tunelling if we use the json-rpc). Has num and raw_rpc_resp attributes
+    'StateChange',  # contains code state_ident
+    'StatePop',
+    'StatePush',  # contains code state_ident
+    'Stickmotion',  # has event.axis; event.value
+    'Update',
 ), _TRADITIONAL_1ST_ETYPE)
 
 
@@ -200,35 +191,21 @@ class KengiEv:
         self.__dict__.update(entries)
 
 
-DATA_FT_SIZE = 16
-
-# deprecated but mandatory for web ctx
-# ------------------------------------
-# STD_SCR_SIZE = [960, 720]
-
-BASE_ENGINE_EVS = [
-    'update', 'draw',
-    'mousemotion', 'mouseup', 'mousedown',
-    'keyup', 'keydown', 'gameover',
-    'conv_begins', 'conv_step', 'conv_finish',  # conversations with npcs
-]
-
-ev_manager = engine_events = None
+# we know this is used, as of May25
+router_singleton = None  # ref on the EngineRouter unique object/ Useful when writing pyv submodules!
+ev_manager = None
+engine_events = None
+# vars to handle the game loop conveniently
+gameover = False
+beginfunc_ref = updatefunc_ref = endfunc_ref = None
 
 bundle_name = None  # set by launcher script
-
 omega_events = list(BASE_ENGINE_EVS)
 
 # - engine related
 mediator = None
-disp_size = [960, 720]
-
-# engine = None  # to store a reference to the ngine itself. Useful when writing pyv submodules!
-
-
 backend_name = ''  # type str, and the default value is '' but it could be modified from elsewhere
 weblib_sig = None
-
 clock = None  # at some point, this should store a ref on an Obj. typed pygame.time.Clock
 max_fps = 45  # will be replaced by whatever is passed to pyv.init(...)
 screen = None
@@ -241,7 +218,3 @@ screen = None
 # sounds = dict()
 # csvdata = dict()
 # data = dict()  # for raw json, most of the time
-
-# 4 vars to handle the game loop conveniently
-gameover = False
-beginfunc_ref = updatefunc_ref = endfunc_ref = None
