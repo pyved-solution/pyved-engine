@@ -4,7 +4,9 @@ from ..concr_engin.pe_vars import KengiEv
 
 class LegitPygameEvSource(DeepEvSource):
 
-    def __init__(self, ev_types_atlas):  # EngineEvTypes):
+    def __init__(self, **kwargs):  # Careful! Since DeepEvSource is used as parameter for CustomizableCode, make use of kwargs is a better practice
+        ev_types_atlas = kwargs['ev_types_atlas']
+
         import pygame as _genuine_pyg
 
         self.joy_bt_map = {
