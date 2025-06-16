@@ -224,9 +224,11 @@ def init(chosen_slug: str) -> None:
         procedure_select_game_genre(metadata)
 
         # ensure to have registered the latest pyved_engine version +use the default alias:
-        metadata[MetadatEntries.Libs]['pyved_engine'] = [
-            vx_with_dots.replace('.', '_'), 'pyv'
-        ]  # defaut alias for the engine is "pyv"
+        metadata[MetadatEntries.Libs][0][1] = vx_with_dots.replace('.', '_')  # version bump
+        if len(metadata[MetadatEntries.Libs][0]) < 3:
+            metadata[MetadatEntries.Libs].append(None)
+        metadata[MetadatEntries.Libs][0][2]='pyv'  # set default alias for the engine is "pyv"
+
         rewrite_metadata(old_name, metadata, temp_dir)
 
         # Create the new dir, then move modified temp. files to the final destination

@@ -489,7 +489,7 @@ class EngineRouter(CustomizableCode):
         print('<< local ctx - run_game >> DEBUG message, kwargs are:', kwargs)
 
         # initfunc(None)  # if we remove kwargs, we cant launch a game client with parameters such as host=...
-        initfunc(None, **kwargs)
+        initfunc(**kwargs)
         while not pe_vars.gameover:
             # it is assumed that the developer calls pyv.flip, once per frame,
             # without the engine taking responsability for that

@@ -39,11 +39,13 @@ def process_download_queue():
 
 
 # What-to-download functions
-# -----------------------------------
+# --------------------------
 
 # Function to fetch and parse the metadata file
-def fetch_metadata(template_name):
-    url = get_url_to_templ(template_name) + 'cartridge/metadat.json'
+def fetch_metadata(template_name):  # TODO right now this only supports NON-FROZEN bundles,
+    # need to take into account that a special case exists, right?
+
+    url = get_url_to_templ(template_name) + 'metadat.json'
     response = requests.get(url)
     if response.status_code != 200:
         raise Exception(f"Failed to fetch metadata for template '{template_name}': {response.status_code}")
@@ -51,7 +53,7 @@ def fetch_metadata(template_name):
 
     # Save metadata locally
     localname = metadata['slug']
-    base_dir = f"{localpath_prefix}/{localname}/cartridge/"
+    base_dir = f"{localpath_prefix}/{localname}/"
     os.makedirs(base_dir, exist_ok=True)
     download_queue.append((url, False, os.path.join(base_dir, 'metadat.json')))
     return metadata
@@ -79,33 +81,36 @@ def dl_launcher_n_thumbnails(template_name, metadata):
     base_dir = f"{localpath_prefix}/{localname}/"
     os.makedirs(base_dir, exist_ok=True)
 
-    # Add launcher and thumbnails to download queue
-    download_queue.append(
-        (get_url_to_templ(template_name) + "launch_game.py", False, os.path.join(base_dir, 'launch_game.py')))
+    # Add thumbnails to download queue
+    # no need at this point,
+    # since as of May25 we support only non-frozen bundles...
+
+    # download_queue.append(
+    #    (get_url_to_templ(template_name) + "launch_game.py", False, os.path.join(base_dir, #'launch_game.py')))
 
     for key in ["thumbnail512x384", "thumbnail512x512"]:
         file_path = metadata[key]
-        download_queue.append((get_url_to_templ(template_name) + f"cartridge/{file_path}", True,
-                               os.path.join(base_dir, 'cartridge', file_path)))
+        download_queue.append((get_url_to_templ(template_name) + file_path, True,
+                               os.path.join(base_dir, file_path)))
 
 
 # Prepare download tasks for all files based on metadata
 def dl_template_cartridge(template_name, metadata):
     base_url = get_url_to_templ(template_name)
     localname = metadata['slug']
-    base_dir = f"{localpath_prefix}/{localname}/cartridge"
+    base_dir = f"{localpath_prefix}/{localname}"
     os.makedirs(base_dir, exist_ok=True)
 
     # Queue source files
     for file_path in metadata.get("source_files", []):
         download_queue.append(
-            (get_url_to_templ(template_name) + f"cartridge/{file_path}", False, os.path.join(base_dir, file_path))
+            (get_url_to_templ(template_name) + file_path, False, os.path.join(base_dir, file_path))
         )
 
     # Queue assets as binary, including special case for sprite sheets
     asset_base = metadata.get("asset_base_folder", "")
     for asset_file in metadata.get("asset_list", []):
-        asset_url = base_url + f"cartridge/{asset_base}/{asset_file}"
+        asset_url = base_url + f"{asset_base}/{asset_file}"
         asset_save_path = os.path.join(base_dir, asset_base, asset_file)
 
         # If asset is a JSON file, download both the JSON and corresponding PNG sprite sheet
@@ -114,7 +119,7 @@ def dl_template_cartridge(template_name, metadata):
 
             # Also queue the PNG file with the same base name
             sprite_sheet_png = asset_file.replace(".json", ".png")
-            sprite_sheet_url = base_url + f"cartridge/{asset_base}/{sprite_sheet_png}"
+            sprite_sheet_url = base_url + f"{asset_base}/{sprite_sheet_png}"
             sprite_sheet_save_path = os.path.join(base_dir, asset_base, sprite_sheet_png)
             download_queue.append((sprite_sheet_url, True, sprite_sheet_save_path))  # Add PNG file to download queue
         else:
@@ -124,13 +129,13 @@ def dl_template_cartridge(template_name, metadata):
     # Queue sounds as binary
     sound_base = metadata.get("sound_base_folder", "")
     for sound_file in metadata.get("sound_list", []):
-        download_queue.append((get_url_to_templ(template_name) + f"cartridge/{sound_base}/{sound_file}", True,
+        download_queue.append((get_url_to_templ(template_name) + f"{sound_base}/{sound_file}", True,
                                os.path.join(base_dir, sound_base, sound_file)))
 
     # Queue data files as binary
     for data_file in metadata.get("data_files", []):
         download_queue.append(
-            (get_url_to_templ(template_name) + f"cartridge/{data_file}", True, os.path.join(base_dir, data_file)))
+            (get_url_to_templ(template_name) + f"{data_file}", True, os.path.join(base_dir, data_file)))
 
 
 def game_template_dl(x):
