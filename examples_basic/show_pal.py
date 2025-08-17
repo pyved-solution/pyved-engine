@@ -1,24 +1,28 @@
-import pyved_engine as pyv
+
 import math
-
-
+from pyved_engine.abstraction.PygameWrapper import PygameWrapper
+import pyved_engine
+# Step 4: (usage) Injecting the dependency explicitly:
+engine_depc = PygameWrapper()
+pyv = pyved_engine.EngineRouter(
+    engine_depc
+)
 pyv.bootstrap_e()
+
 
 # const
 START_POS = (16, 32)
 BAR_LENGTH = 300
 TILE_HEIGHT = 48
 
-pygame = pyv.pygame
-
 
 # - init
-pyv.init(pyv.LOW_RES_MODE, wcaption='kengi.palettes showcase')
+pyv.init(2, wcaption='kengi.palettes showcase')
 
 gameover = False
-cl = pygame.time.Clock()
+cl = pyv.vars.clock
 rounding_type = round_func = lambda x: x
-ft = pygame.font.Font(None, 25)
+ft = pyv.new_font_obj(None, 25)
 
 pos2tile = dict()
 pos2label = dict()
@@ -37,7 +41,7 @@ for name, pal in pyv.pal.ALL_PALETTES.items():
         t -= tile_size
 
         last_keyy = keyy = (d + START_POS[0] + curr_offset_x, START_POS[1] + curr_offset_y)
-        tile_obj = pygame.Surface((tile_size, 8))
+        tile_obj = pyv.surface_create((tile_size, 8))
         tile_obj.fill(col)
         pos2tile[keyy] = tile_obj
 
@@ -74,11 +78,11 @@ def run_game():
     scr = pyv.get_surface()
 
     while not gameover:
-        for ev in pygame.event.get():
-            if ev.type == pygame.QUIT:
+        for ev in pyv.event_get():
+            if ev.type == pyv.EngineEvTypes.Quit:
                 gameover = True
-            elif ev.type == pygame.KEYDOWN:
-                if ev.key == pygame.K_ESCAPE:
+            elif ev.type == pyv.EngineEvTypes.Keydown:
+                if ev.key == pyv.keycodes.K_ESCAPE:
                     gameover = True
         # display
         scr.fill((0, 0, 255))
@@ -92,8 +96,8 @@ def run_game():
 
         pyv.flip()
         cl.tick(60)
-
-    pyv.quit()
+    print('clooosii')
+    pyv.close_game()
     print('bye')
 
 

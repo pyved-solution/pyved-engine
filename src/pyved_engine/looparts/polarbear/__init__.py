@@ -19,5 +19,5 @@ from Anne Archibald's GearHead Prime demo.
 
 from . import image
 from . import widgets
-from .general import default_border, render_text, wait_event, TIMEREVENT, INFO_GREEN
+from .general import default_border, render_text,  INFO_GREEN  # wait_event, TIMEREVENT
 from .image import draw_text

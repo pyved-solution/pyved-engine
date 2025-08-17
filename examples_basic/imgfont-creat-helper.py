@@ -7,11 +7,11 @@ import pyved_engine as pyv
 
 
 pyv.init(pyv.RETRO_MODE)
-pygame = pyv.pygame
+
 screen = pyv.get_surface()
 width, height = screen.get_size()
 FT_PATH = 'mixed_assets/alphbeta.ttf'
-pyg_font = pygame.font.Font(FT_PATH, 12)
+pyg_font = pyv.new_font_obj(FT_PATH, 12)
 
 block = pyv.gui.TextBlock(
     pyg_font, 'no text', (255, 0, 0)  # pick either pyg_font or custom_ft
@@ -29,19 +29,26 @@ block.debug = 0
 INIT_TXT = "ABCDEFGHIJKLMNOPQRSTUVWXYZa\nabcdefghijklmnopqrstuvwxyz.\n"
 INIT_TXT += ".-,:+\'!?0\n0123456789()/_=\\[]*\"<>;@$%{}'\n"
 block.text = INIT_TXT
+mod = False
 
 while not can_exit:
-    for ev in pygame.event.get():
-        if ev.type == pygame.QUIT:
+    for ev in pyv.evsys0.get():
+        if ev.type == pyv.evsys0.QUIT:
             can_exit = True
-        elif ev.type == pygame.KEYDOWN:
-            if ev.key == pygame.K_RETURN:
+        elif ev.type == pyv.evsys0.KEYDOWN:
+            if ev.key == pyv.evsys0.K_RETURN:
                 block.text_align = (block.text_align + 1) % 2  # switch text align
-            elif ev.key == pygame.K_ESCAPE:
+            elif ev.key == pyv.evsys0.K_ESCAPE:
                 can_exit = True
-        elif ev.type == pygame.KEYUP:
-            if not pygame.key.get_pressed()[pygame.K_SPACE]:
-                block.text = INIT_TXT
+
+    if pyv.evsys0.pressed_keys()[pyv.evsys0.K_SPACE]:
+        if block.text == INIT_TXT:
+            block.text = 'Coucou cest un test et cest\nnimporte quoi ce que l\'on tape ici'
+            mod = True
+    else:
+        if mod:
+            block.text = INIT_TXT
+            mod = False
     screen.fill(GL_BG_COLOR)
     block.draw(screen)
     pyv.flip()

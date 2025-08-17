@@ -1,7 +1,15 @@
-import pyved_engine as pyv
-pyv.init(2)
+from pyved_engine.sublayer_implem import PygameWrapper
+import pyved_engine
+# Step 4: (usage) Injecting the dependency explicitly:
+engine_depc = PygameWrapper()
+pyv = pyved_engine.EngineRouter(
+    engine_depc
+)
+pyv.bootstrap_e()
 
-pygame = pyv.pygame
+pyv.init(pyv.LOW_RES_MODE)
+
+
 screen = pyv.get_surface()
 width, height = screen.get_size()
 
@@ -9,14 +17,18 @@ INIT_TXT = 'hello user this\nis\nsome\ndope\ntext'
 ALT_TXT = 'i\nunderstand that\nyou watch the console'
 USING_IMGBASED_FT = True
 
+pyv.preload_assets(
+    {'asset_list': ['niobe_font.png', ], 'sound_list': [], 'data_files': []}, prefix_asset_folder='mixed_assets/', prefix_sound_folder='./'
+)
+
 if USING_IMGBASED_FT:
     ft_obj = pyv.gui.ImgBasedFont(
         (15, 130, 243),  # we specify: the color that should be viewed as transparent
-        img=pygame.image.load('mixed_assets/niobe_font.png')
+        img=pyv.vars.images['niobe_font']
     )  # special font format
 else:
     FT_PATH = 'mixed_assets/alphbeta.ttf'
-    ft_obj = pygame.font.Font(FT_PATH, 16)
+    ft_obj = pyv.new_font_obj(FT_PATH, 16)
 
 
 block = pyv.gui.TextBlock(ft_obj, INIT_TXT, (0, 0, 0))
@@ -25,18 +37,18 @@ print('*~*~*\npress and hold the space bar ; press ENTER to change alignment')
 ended = False
 
 while not ended:
-    for ev in pygame.event.get():
-        if ev.type == pygame.QUIT:
+    for ev in pyv.evsys0.get():
+        if ev.type == pyv.evsys0.QUIT:
             ended = True
-        elif ev.type == pygame.KEYDOWN:
-            if ev.key == pygame.K_RETURN:
+        elif ev.type == pyv.evsys0.KEYDOWN:
+            if ev.key == pyv.evsys0.K_RETURN:
                 block.text_align = (block.text_align + 1) % 2  # switch text align
-            elif ev.key == pygame.K_SPACE:
+            elif ev.key == pyv.evsys0.K_SPACE:
                 block.text = ALT_TXT
-            elif ev.key == pygame.K_ESCAPE:
+            elif ev.key == pyv.evsys0.K_ESCAPE:
                 ended = True
-        elif ev.type == pygame.KEYUP:
-            if not pygame.key.get_pressed()[pygame.K_SPACE]:
+        elif ev.type == pyv.evsys0.KEYUP:
+            if not pyv.evsys0.key.get_pressed()[pyv.evsys0.K_SPACE]:
                 block.text = INIT_TXT
     screen.fill('white')
     block.draw(screen)

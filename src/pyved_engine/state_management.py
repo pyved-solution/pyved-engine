@@ -1,17 +1,12 @@
-import time
-
-from . import vars
-from .compo import vscreen
-from ._hub import events
-from .core.events import EngineEvTypes  # latest version of event sys
-from .custom_struct import Stack, StContainer, enum
 from ._classes import BaseGameState
+from .abstraction import EvSystem
+from .concr_engin import pe_vars
+from .custom_struct import Stack, StContainer, enum
 
-multistate_flag = False
+
+multistite_flag = False
 stack_based_ctrl = None
 state_stack = None
-
-
 _DefaultGsList = enum(
     'Room1',
 )
@@ -33,7 +28,7 @@ _default_st_mapping = {  # bind identifier to class
 }
 
 
-class StateStackCtrl(events.EvListener):
+class StateStackCtrl(EvSystem.EvListener):
     """
     used to manage the game state but also provide the very basic game_loop
     """
@@ -41,7 +36,7 @@ class StateStackCtrl(events.EvListener):
 
     def __init__(self, all_gs=None, st_to_cls_mapping=None):
         super().__init__()
-        self._clock = vars.clock
+        self._clock = pe_vars.clock
 
         self._gs_omega = _DefaultGsList if all_gs is None else all_gs
         adhoc_mapping = _default_st_mapping if all_gs is None else st_to_cls_mapping
@@ -52,8 +47,6 @@ class StateStackCtrl(events.EvListener):
         self._st_container = StContainer()
         self._st_container.setup(self._gs_omega, adhoc_mapping, None)
         self.__state_stack = Stack()
-
-        self.gameover = False
 
     def get_state_by_code(self, k):
         return self._st_container.retrieve(k)
@@ -96,7 +89,7 @@ class StateStackCtrl(events.EvListener):
             state_obj = self._st_container.retrieve(tmp)
             state_obj.resume()
         else:
-            vars.gameover = True
+            pe_vars.gameover = True
 
     # --------------------
     #  CALLBACKS
@@ -107,7 +100,9 @@ class StateStackCtrl(events.EvListener):
         print('>>>pushin a state on the stack')
 
     def on_gameover(self, ev):
-        self.gameover = True
+        print('poppin all')
+        while self.__state_stack.count() > 0:
+            self._pop_state()
 
     def on_state_change(self, ev):
         state_obj = self._st_container.retrieve(ev.state_ident)
@@ -121,25 +116,27 @@ class StateStackCtrl(events.EvListener):
         self._pop_state()
 
     # - helper function -
+    # TODO how to make this cls compatible with Web ctx, then?
     def loop(self) -> None:
-        """
-        its forbidden to call .loop() in the web ctx, but its convenient in the local ctx
-        if one wants to test a program without harnessing the whole pyVM
-        """
-        print('*Warning! Never use .loop in the web Ctx*')
-        self.turn_on()
+        raise NotImplementedError
+        # its forbidden to call .loop() in the web ctx, but its convenient in the local ctx
+        # if one wants to test a program without harnessing the whole pyVM
 
-        self.pev(events.EngineEvTypes.Gamestart)  # ensure we will call .enten() on the initial/eden state
-        while not (self.gameover or vars.gameover):
-            infot = time.time()
-            self.pev(EngineEvTypes.Update, curr_t=infot)
-            self.pev(EngineEvTypes.Paint, screen=vars.screen)
-            self._manager.update()
-            vscreen.flip()
-            self._clock.tick(vars.max_fps)
-        # TODO shall we ensure we have pop'ed every single state?
-        # self.proper_exit()
-        print(self.__class__.INFO_STOP_LOOP_MSG)
+        # print('*Warning! Never use .loop in the web Ctx*')
+        # self.turn_on()
+        # e_types = EvSystem.EngineEvTypes
+        #
+        # self.pev(e_types.Gamestart)  # ensure we will call .enten() on the initial/eden state
+        # while not pe_vars.gameover:
+        #     infot = time.time()
+        #     self.pev(e_types.Update, curr_t=infot)
+        #     self.pev(e_types.Paint, screen=pe_vars.screen)
+        #     self._manager.update()
+        #     vscreen.flip()
+        #     self._clock.tick(pe_vars.max_fps)
+        # # TODO shall we ensure we have pop'ed every single state?
+        # # self.proper_exit()
+        # print(self.__class__.INFO_STOP_LOOP_MSG)
 
 
 def declare_game_states(gs_enum, assoc_gscode_gscls):

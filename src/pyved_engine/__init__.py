@@ -1,66 +1,61 @@
 """
-+----------------------------------------------------+
-| Pyv - a pythonic 2d Game Engine                    |
-| Our motto ~ Never slow down the innovation         |
-|                                                    |
-| https://github.com/gaudiatech/pyved-engine         |
-| an open-source project started by GAUDIA TECH INC. |
-|                                                    |
-| Main author is Thomas EDER a.k.a. moonbak       |
-| (github.com/wkta) - Contact thomas.iw@kata.games   |
-+----------------------------------------------------+
+| A pythonic 2d Game Engine
+| Our motto ~ Never slow down the innovation
+| https://github.com/pyved-solution/pyved-engine
+| an open-source project initiated by GAUDIA TECH INC.
+
+Main contributor: Thomas I. EDER / moonbak
+Contact: thomas@katagames.io
 """
-from . import _hub
-hub = _hub
+from . import hub
+from .EngineRouter import EngineRouter
+from .abstraction.EvSystem import Emitter, EvListener, EngineEvTypes
+from .compo.GameTpl import GameTpl  # legacy class
+from .concr_engin import pe_vars
 
-from .context_bridge import *  # api is already packed in this file
-from . import custom_struct as struct
-from .core.events import Emitter, EvListener, EngineEvTypes
-from .core import legacy_evs  # we just copy the event system of pygame
-from ._classes import *
-from .Singleton import Singleton
-from .compo import gfx
+# you can activate the lines below
+# from . import evsys0
+# from .utils._ecs_pattern import entity, component, System, SystemManager, EntityManager
 
-from . import vars
-
-# deprecated
-from .compo import vscreen
-
-# TODO remove this when we can
-# ive kept it for retro-compatibility with projects that target pyv v23.6a1
-# such as demos/ecs_naif or the very early stage pyved ships-with-GUI editor
-from ._ecs_pattern import entity, component, System, SystemManager, EntityManager
-from . import evsys0
-
-# useful ALIAS! (webctx)
-defs = vars
-
-
-def get_version():
-    return vars.ENGINE_VERSION_STR
+# ...In case you need a stronger retro-compatibility with projects targeting pyv v23.6a1
+# such as:
+# - demos/ecs_naif, or
+# - ships-with-GUI editor
 
 
 _stored_kbackend = None
-# deprec.
-vars.weblib_sig = _backend_name = ''
-quit = close_game
+_context_type = 'local'
+_stored_ev_source_cls = None
 
 
-def set_webbackend_type(xval):
-    global _backend_name
-    vars.weblib_sig = _backend_name = xval
-    vars.backend_name = 'web'
+def set_exec_context(context_type: str, binding=None, stored_cls=None):
+    global _context_type, _stored_kbackend, _stored_ev_source_cls
+    assert context_type in ('local', 'web')
+    _context_type = context_type
+    if 'web' == context_type:
+        if binding is None:
+            raise ValueError('the "binding" argument is missing, in case of a web ctx')
+        if stored_cls is None:
+            raise ValueError('missing ev_source_cls')
+        _stored_kbackend = binding
+        _stored_ev_source_cls = stored_cls
 
 
-# the basic API is expanded via our special "hub" component
-def __getattr__(attr_name):
-    if attr_name in ('ver', 'vernum'):
-        return get_version()
-    elif attr_name == 'Sprite':
-        return _hub.pygame.sprite.Sprite
-    elif attr_name == 'SpriteGroup':
-        return _hub.pygame.sprite.Group
-    elif attr_name == 'sprite_collision':
-        return _hub.pygame.sprite.spritecollide
+def set_engine_ref(x):
+    pe_vars.router_singleton = x
 
-    return getattr(_hub, attr_name)
+
+def get_engine_router() -> EngineRouter:
+    """
+    :return: the unique instance of EngineRouter class
+    """
+    if pe_vars.router_singleton:
+        return pe_vars.router_singleton
+    from .EngineRouter import EngineRouter
+    # if 'local' == _context_type:
+    #     from .abstraction.PygameWrapper import PygameWrapper
+    #     xcls = PygameWrapper
+    # else:
+    #     xcls = _stored_kbackend
+    y = pe_vars.router_singleton = EngineRouter()
+    return y

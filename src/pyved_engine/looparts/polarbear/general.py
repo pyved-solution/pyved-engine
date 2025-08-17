@@ -1,14 +1,12 @@
 import random
 import weakref
-
 from . import frects
 from . import image
 from .image import TEXT_COLOR, truncline, render_text
-from ... import _hub
-from ... import vars
+from ...concr_engin import core
 
 
-pygame = _hub.pygame
+pyv = core.ref_engine()
 
 
 class KeyObject(object):
@@ -58,7 +56,7 @@ class Border(object):
     def render(self, dest, scr=None):
         """Draw this decorative border at dest on screen."""
         if scr is None:
-            scr = vars.screen
+            scr = pyv.get_surface()
 
         # We're gonna draw a decorative border to surround the provided area.
         if self.border is None:
@@ -152,6 +150,8 @@ class GameState(object):
                 self.notifications.remove(n)
 
     def do_flip(self, show_widgets=True, reset_standing_by=True):
+        # TODO inspect before removal
+        raise NotImplementedError  # not sure we should still use this in Pyved ...
         self.widget_tooltip = None
         if show_widgets:
             self.render_widgets()
@@ -214,7 +214,7 @@ class GameState(object):
 
     def resize(self):
         w, h = self.physical_screen.get_size()
-        self.screen = pygame.Surface((max(800, 600 * w // h), 600))
+        self.screen = pyv.surface_create((max(800, 600 * w // h), 600))
 
 
 INPUT_CURSOR = None
@@ -229,13 +229,13 @@ POSTERS = list()
 
 my_state = GameState()
 # fix: add ref to screen
-my_state.screen = vars.screen
+# my_state.screen = _vars.screen
 
 # The FPS the rules runs at.
 FPS = 30
 
 # Use a timer to control FPS.
-TIMEREVENT = pygame.USEREVENT
+# TIMEREVENT = pygame.USEREVENT
 
 # Remember whether or not this unit has been initialized, since we don't need
 # to initialize it more than once.
@@ -259,125 +259,123 @@ def wrap_with_records(fulltext, font, maxwidth):
     return wrapped, line_lengths
 
 
-def wait_event():
-    # Wait for input, then return it when it comes.
-    ev = pygame.event.wait()
-
-    # Record if a quit event took place
-    if ev.type == pygame.QUIT:
-        my_state.got_quit = True
-    elif ev.type == TIMEREVENT:
-        pygame.event.clear(TIMEREVENT)
-
-    # Inform any interested widgets of the event.
-    my_state.widget_clicked = False
-    if my_state.widgets_active:
-        for w in my_state.widgets:
-            w.respond_event(ev)
-
-    # If the view has a check_event method, call that.
-    if my_state.view and hasattr(my_state.view, "check_event"):
-        my_state.view.check_event(ev)
-
-    return ev
-
-
+# def wait_event():
+#     # Wait for input, then return it when it comes.
+#     ev = pygame.event.wait()
+#
+#     # Record if a quit event took place
+#     if ev.type == pygame.QUIT:
+#         my_state.got_quit = True
+#     elif ev.type == TIMEREVENT:
+#         pygame.event.clear(TIMEREVENT)
+#
+#     # Inform any interested widgets of the event.
+#     my_state.widget_clicked = False
+#     if my_state.widgets_active:
+#         for w in my_state.widgets:
+#             w.respond_event(ev)
+#
+#     # If the view has a check_event method, call that.
+#     if my_state.view and hasattr(my_state.view, "check_event"):
+#         my_state.view.check_event(ev)
+#
+#     return ev
 
 
-def alert(text, font=None):
-    if not font:
-        font = my_state.medium_font
-    # mydest = pygame.Rect( my_state.screen.get_width() // 2 - 200, my_state.screen.get_height()//2 - 100, 400, 200 )
-    mytext = render_text(font, text, 400)
-    mydest = mytext.get_rect(center=(my_state.screen.get_width() // 2, my_state.screen.get_height() // 2))
+# def alert(text, font=None):
+#     if not font:
+#         font = my_state.medium_font
+#     # mydest = pygame.Rect( my_state.screen.get_width() // 2 - 200, my_state.screen.get_height()//2 - 100, 400, 200 )
+#     mytext = render_text(font, text, 400)
+#     mydest = mytext.get_rect(center=(my_state.screen.get_width() // 2, my_state.screen.get_height() // 2))
+#
+#     pygame.event.clear([TIMEREVENT, pygame.KEYDOWN])
+#     while True:
+#         ev = wait_event()
+#         if (ev.type == pygame.MOUSEBUTTONUP) or (ev.type == pygame.QUIT) or (ev.type == pygame.KEYDOWN):
+#             return ev
+#         elif ev.type == TIMEREVENT:
+#             if my_state.view:
+#                 my_state.view()
+#             default_border.render(mydest)
+#             my_state.screen.blit(mytext, mydest)
+#             my_state.do_flip()
 
-    pygame.event.clear([TIMEREVENT, pygame.KEYDOWN])
-    while True:
-        ev = wait_event()
-        if (ev.type == pygame.MOUSEBUTTONUP) or (ev.type == pygame.QUIT) or (ev.type == pygame.KEYDOWN):
-            return ev
-        elif ev.type == TIMEREVENT:
-            if my_state.view:
-                my_state.view()
-            default_border.render(mydest)
-            my_state.screen.blit(mytext, mydest)
-            my_state.do_flip()
 
-
-def alert_display(display_fun):
-    pygame.event.clear([TIMEREVENT, pygame.KEYDOWN])
-    while True:
-        ev = wait_event()
-        if (ev.type == pygame.MOUSEBUTTONUP) or (ev.type == pygame.QUIT) or (ev.type == pygame.KEYDOWN):
-            break
-        elif ev.type == TIMEREVENT:
-            if my_state.view:
-                my_state.view()
-            display_fun()
-            my_state.do_flip()
+# def alert_display(display_fun):
+#     pygame.event.clear([TIMEREVENT, pygame.KEYDOWN])
+#     while True:
+#         ev = wait_event()
+#         if (ev.type == pygame.MOUSEBUTTONUP) or (ev.type == pygame.QUIT) or (ev.type == pygame.KEYDOWN):
+#             break
+#         elif ev.type == TIMEREVENT:
+#             if my_state.view:
+#                 my_state.view()
+#             display_fun()
+#             my_state.do_flip()
 
 
 ALLOWABLE_CHARACTERS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890()-=_+,.?"'
 
 
-def input_string(font=None, redrawer=None, prompt="Enter text below", prompt_color=(255, 255, 255),
-                 input_color=TEXT_COLOR, border=default_border):
-    # Input a string from the user.
-    it = []
-    keep_going = True
-
-    if not font:
-        font = BIGFONT
-
-    myrect = pygame.Rect(my_state.screen.get_width() / 2 - 200, my_state.screen.get_height() / 2 - 32, 400, 64)
-    prompt_image = font.render(prompt, True, prompt_color)
-
-    while keep_going:
-        ev = wait_event()
-
-        if ev.type == TIMEREVENT:
-            if redrawer != None:
-                redrawer()
-            border.render(myrect)
-            mystring = "".join(it)
-            myimage = font.render(mystring, True, input_color)
-            my_state.screen.blit(prompt_image, (my_state.screen.get_width() / 2 - prompt_image.get_width() / 2,
-                                                my_state.screen.get_height() / 2 - prompt_image.get_height() - 2))
-            my_state.screen.set_clip(myrect)
-            my_state.screen.blit(myimage, (
-            my_state.screen.get_width() / 2 - myimage.get_width() / 2, my_state.screen.get_height() / 2))
-            INPUT_CURSOR.render(
-                (my_state.screen.get_width() / 2 + myimage.get_width() / 2 + 2, my_state.screen.get_height() / 2),
-                ( my_state.anim_phase // 3 ) % 4)
-            my_state.screen.set_clip(None)
-            my_state.do_flip(False)
-
-
-        elif ev.type == pygame.KEYDOWN:
-            if (ev.key == pygame.K_BACKSPACE) and (len(it) > 0):
-                del it[-1]
-            elif (ev.key == pygame.K_RETURN) or (ev.key == pygame.K_ESCAPE):
-                keep_going = False
-            elif (ev.unicode in ALLOWABLE_CHARACTERS) and (len(ev.unicode) > 0):
-                it.append(ev.unicode)
-        elif ev.type == pygame.QUIT:
-            keep_going = False
-    return "".join(it)
-
-
-def please_stand_by(caption=None):
-    if not my_state.standing_by:
-        img = pygame.image.load(random.choice(POSTERS)).convert()
-        dest = img.get_rect(center=(my_state.screen.get_width() // 2, my_state.screen.get_height() // 2))
-        my_state.screen.fill((0, 0, 0))
-        my_state.screen.blit(img, dest)
-        if caption:
-            mytext = BIGFONT.render(caption, True, TEXT_COLOR)
-            dest2 = mytext.get_rect(topleft=(dest.x + 32, dest.y + 32))
-            default_border.render(my_state.screen, dest2)
-            my_state.screen.blit(mytext, dest2)
-        my_state.standing_by = True
-        my_state.do_flip(False, reset_standing_by=False)
+# def input_string(font=None, redrawer=None, prompt="Enter text below", prompt_color=(255, 255, 255),
+#                  input_color=TEXT_COLOR, border=default_border):
+#     # Input a string from the user.
+#     it = []
+#     keep_going = True
+#
+#     if not font:
+#         font = BIGFONT
+#
+#     myrect = pygame.Rect(my_state.screen.get_width() / 2 - 200, my_state.screen.get_height() / 2 - 32, 400, 64)
+#     prompt_image = font.render(prompt, True, prompt_color)
+#
+#     while keep_going:
+#         ev = wait_event()
+#
+#         if ev.type == TIMEREVENT:
+#             if redrawer != None:
+#                 redrawer()
+#             border.render(myrect)
+#             mystring = "".join(it)
+#             myimage = font.render(mystring, True, input_color)
+#             my_state.screen.blit(prompt_image, (my_state.screen.get_width() / 2 - prompt_image.get_width() / 2,
+#                                                 my_state.screen.get_height() / 2 - prompt_image.get_height() - 2))
+#             my_state.screen.set_clip(myrect)
+#             my_state.screen.blit(myimage, (
+#             my_state.screen.get_width() / 2 - myimage.get_width() / 2, my_state.screen.get_height() / 2))
+#             INPUT_CURSOR.render(
+#                 (my_state.screen.get_width() / 2 + myimage.get_width() / 2 + 2, my_state.screen.get_height() / 2),
+#                 ( my_state.anim_phase // 3 ) % 4)
+#             my_state.screen.set_clip(None)
+#             my_state.do_flip(False)
+#
+#
+#         elif ev.type == pygame.KEYDOWN:
+#             if (ev.key == pygame.K_BACKSPACE) and (len(it) > 0):
+#                 del it[-1]
+#             elif (ev.key == pygame.K_RETURN) or (ev.key == pygame.K_ESCAPE):
+#                 keep_going = False
+#             elif (ev.unicode in ALLOWABLE_CHARACTERS) and (len(ev.unicode) > 0):
+#                 it.append(ev.unicode)
+#         elif ev.type == pygame.QUIT:
+#             keep_going = False
+#     return "".join(it)
+#
+#
+# def please_stand_by(caption=None):
+#     if not my_state.standing_by:
+#         img = pygame.image.load(random.choice(POSTERS)).convert()
+#         dest = img.get_rect(center=(my_state.screen.get_width() // 2, my_state.screen.get_height() // 2))
+#         my_state.screen.fill((0, 0, 0))
+#         my_state.screen.blit(img, dest)
+#         if caption:
+#             mytext = BIGFONT.render(caption, True, TEXT_COLOR)
+#             dest2 = mytext.get_rect(topleft=(dest.x + 32, dest.y + 32))
+#             default_border.render(my_state.screen, dest2)
+#             my_state.screen.blit(mytext, dest2)
+#         my_state.standing_by = True
+#         my_state.do_flip(False, reset_standing_by=False)
 
 
 class BasicNotification(frects.Frect):

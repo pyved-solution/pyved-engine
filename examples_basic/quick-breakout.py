@@ -7,32 +7,35 @@ Using c=pyv.get_game_ctrl() then c.loop()
 is very handy but it becomes tricky when sharing games online
 """
 import math
-import pyved_engine as pyv
+from pyved_engine.abstraction.PygameWrapper import PygameWrapper
+import pyved_engine
+# Step 4: (usage) Injecting the dependency explicitly:
+engine_depc = PygameWrapper()
+pyv = pyved_engine.EngineRouter(
+    engine_depc
+)
+pyv.bootstrap_e()
 
 
-pyv.bootstrap_e()  # important because we use pyv.Sprite and other things based off pygame
-
-
-# CONSTS:
+# --------------------------------
+# CONSTANTS
 # (Define some colors)
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 BLUE = (0, 0, 255)
-
 # (Size of break-out blocks)
 BLOCK_W = 54
 BLOCK_H = 30
 BLOCK_SPACING = 2
 WALL_X, WALL_Y = 4, 80
-
 # ball-related
 BALL_INIT_POS = 480, 277
 BALL_SIZE = 22
-
 # misc
 SCR_WIDTH = 960
 
-# GL.VARIABLES
+# --------------------------------
+# GLOBAL VARIABLES
 clock = screen = None
 player_lost = False
 blocks = None
@@ -173,10 +176,9 @@ class Player(pyv.Sprite):
             self.rect.x = self.screenwidth - self.width
 
 
-@pyv.declare_begin
-def init_game(vmst=None):
+def init(vmst=None):
     global player_lost, screen, clock, blocks, player, allsprites, font, balls, background, ball
-    pyv.init(wcaption='Breakout', maxfps=25)  # name the game-> window caption
+    pyv.init(1, wcaption='Breakout', maxfps=25)  # name the game-> window caption
     screen = pyv.get_surface()
 
     # This is a font we use to draw text on the screen (size 36)
@@ -225,14 +227,13 @@ def init_game(vmst=None):
     clock = pyv.create_clock()
 
 
-@pyv.declare_update
-def upd(time_info=None):
+def update(time_info=None):
     global player_lost, clock, blocks, player, allsprites, font, ball
 
     # Main program loop
     # Process the events in the game
-    for event in pyv.evsys0.get():
-        if event.type == pyv.evsys0.QUIT:
+    for event in pyv.event_get():
+        if event.type == pyv.EngineEvTypes.Quit:
             pyv.vars.gameover = True
 
     # Update the ball and player position as long
@@ -281,10 +282,8 @@ def upd(time_info=None):
     pyv.flip()
 
 
-@pyv.declare_end
-def done(vmst=None):
+def end_game(vmst=None):
     pyv.close_game()
 
 
-if __name__ == '__main__':
-    pyv.run_game()
+pyv.run_game(init, update, end_game)

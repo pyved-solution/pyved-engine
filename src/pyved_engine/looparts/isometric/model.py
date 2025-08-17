@@ -5,7 +5,7 @@ import struct
 from base64 import b64decode
 from xml.etree import ElementTree
 from zlib import decompress
-from ... import vars
+from ... import pe_vars
 from .flags import *
 from ... import _hub
 

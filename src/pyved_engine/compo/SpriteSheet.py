@@ -1,7 +1,6 @@
 import json
 from typing import List, Dict
-
-from .. import _hub
+from ..concr_engin import core
 
 """
 warning:
@@ -28,6 +27,9 @@ For the hash format, it uses the key as the filename and extracts other details 
 Each frame is converted into an instance of the Frame class, which acts as a high-level, unified representation.
 Output: The program prints the detected format and the loaded frames.
 """
+
+
+pyv = core.ref_engine()
 
 
 class Frame:
@@ -128,7 +130,7 @@ class SpriteSheet:
 
         open_img = f'{p}{filename_noext_nopath}.png'
         print('open img->', open_img)
-        self.sheet_surf = _hub.pygame.image.load(open_img)
+        self.sheet_surf = pyv.image_load(open_img)  # TODO needs to be forbidden -> preload _all philosophy!
         if pathinfo and pathinfo != './':
             p = pathinfo
         json_def_file = open(f'{p}{filename_noext_nopath}.json', 'r')
@@ -193,9 +195,9 @@ class SpriteSheet:
                 single_frame.x, single_frame.y,
                 single_frame.w, single_frame.h
             )
-            subsurface = self.sheet_surf.subsurface(_hub.pygame.Rect(*_rect_arg)).copy()
+            subsurface = self.sheet_surf.subsurface(pyv.new_rect_obj(*_rect_arg)).copy()
             eff_w, eff_h = subsurface.get_size()
-            self.assoc_name_spr[single_frame.filename] = _hub.pygame.transform.scale(
+            self.assoc_name_spr[single_frame.filename] = pyv.surface_transform(
                 subsurface, (eff_w*mscale, eff_h*mscale)
             )
 

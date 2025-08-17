@@ -1,7 +1,13 @@
-from .. import _hub
-from .. import struct
-from ..import vars
-from ..foundation import defs
+"""
+all shards/looparts elements start the same way
+"""
+
+# engine_link = pe_vars = None
+from ..concr_engin import pe_vars
+from ..concr_engin import core
+
+
+engine_link = core.ref_engine()
 
 
 # - constants
@@ -60,7 +66,7 @@ def init(chosen_char_size=None):
         _char_size = chosen_char_size
 
     _sm_ready = True
-    _screen = vars.screen
+    _screen = pe_vars.screen
     scrw, scrh = _screen.get_size()
     adhocw = scrw // _char_size
     adhoch = scrh // _char_size
@@ -68,7 +74,7 @@ def init(chosen_char_size=None):
         raise ValueError('div tombe pas juste pour calculer w')
     if adhoch != scrh / _char_size:
         raise ValueError('div tombe pas juste pour calculer h')
-    _matrix = struct.IntegerMatrix((adhocw, adhoch))
+    _matrix = engine_link.struct.IntegerMatrix((adhocw, adhoch))
     _lastcol = -1 + adhocw
     _lastrow = -1 + adhoch
 
@@ -182,7 +188,7 @@ def set_char_size(v):
 
     decoded = base64.b64decode(_EMB_TILEMAPS_PNGF[_char_size])
     filelike_bdata = io.BytesIO(decoded)
-    _curr_spritesheet = _hub.pygame.image.load(filelike_bdata)
+    _curr_spritesheet = engine_link.image_load(filelike_bdata)
     _curr_spritesheet.set_colorkey('black')
 
     if _KFont.inst:
@@ -190,8 +196,8 @@ def set_char_size(v):
         _KFont.inst.cached_letters.clear()  # reset cache!
 
     # refresh gl variables
-    _last_col = -1 + defs.STD_SCR_SIZE[0] // _char_size
-    _last_row = -1 + defs.STD_SCR_SIZE[1] // _char_size
+    _last_col = -1 + engine_link.defs.STD_SCR_SIZE[0] // _char_size
+    _last_row = -1 + engine_link.defs.STD_SCR_SIZE[1] // _char_size
 
 
 # -------------------------------------------------
@@ -219,7 +225,7 @@ class _KFont:
             inp = list(karray_or_txt)
         else:
             inp = karray_or_txt
-        rez = _hub.pygame.surface.Surface((_char_size * len(inp), _char_size))
+        rez = engine_link.surface_create((_char_size * len(inp), _char_size))
         rez.fill((0, 0, 0))
         char_destpos = [0, 0]
         for elt in inp:
@@ -227,15 +233,15 @@ class _KFont:
             rez.blit(s, char_destpos)
             char_destpos[0] += _char_size
         # replace fg color
-        fres = _hub.pygame.surface.Surface((_char_size * len(inp), _char_size))
+        fres = engine_link.surface_create((_char_size * len(inp), _char_size))
         if bg_color is None:
             fres.fill((255, 0, 255))
             fres.set_colorkey((255, 0, 255))
         else:
             fres.fill(bg_color)
 
-        _hub.pygame.transform.threshold(
-            fres, rez, (255, 255, 255), (0, 0, 0), _hub.pygame.Color(fg_color), inverse_set=True
+        engine_link.transform.threshold(
+            fres, rez, (255, 255, 255), (0, 0, 0), fg_color, inverse_set=True
         )
         return fres
 
@@ -250,7 +256,7 @@ class _KFont:
         if k in self.cached_letters:
             r = self.cached_letters[k]
         else:
-            r = _hub.pygame.surface.Surface((_char_size, _char_size)).convert()
+            r = engine_link.surface_create((_char_size, _char_size)).convert()
             r.fill((255, 0, 255))
             r.blit(
                 self.surf, (0, 0), (_char_size * (k % nbparcol), _char_size * (k // nbparcol), _char_size, _char_size)
@@ -258,5 +264,3 @@ class _KFont:
             r.set_colorkey((255, 0, 255))
             self.cached_letters[k] = r
         return r
-
-

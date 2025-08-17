@@ -1,9 +1,8 @@
 import time
 from abc import ABCMeta, abstractmethod
-from .. import _hub
-from .. import context_bridge as gamedev_api
-from ..core.events import EvManager, EngineEvTypes
-from .. import vars as engine_vars
+
+from ..abstraction.EvSystem import EvManager, EngineEvTypes
+from ..concr_engin import pe_vars as engine_vars
 
 
 class GameTpl(metaclass=ABCMeta):
@@ -15,10 +14,10 @@ class GameTpl(metaclass=ABCMeta):
     ERR_LOCK_MSG = 'kengi.GameTpl.loop called while SAFETY_LOCK is on!'
     SAFETY_LOCK = False  # can be set to True from outside, if you don't want a game to call .loop()
 
-    def __init__(self):
-        self.gameover = False
+    def __init__(self, engine_inst):
         self.nxt_game = 'niobepolis'
         self._manager = None
+        self.engine = engine_inst
 
     @abstractmethod
     def get_video_mode(self):
@@ -47,28 +46,31 @@ class GameTpl(metaclass=ABCMeta):
          - set the _manager attribute (bind the ev manager to self._manager)
          - call self._manager.setup(...) with args
         """
-        gamedev_api.init(mode=self.get_video_mode())
+        self.engine.init(self.get_video_mode())
         self._manager = EvManager.instance()
+        print('manager:', self._manager)
         self._manager.setup(self.list_game_events())
         self._manager.post(EngineEvTypes.Gamestart)  # pushed to notify that we have really started playing
         gs_enum, mapping = self.list_game_states()
         if gs_enum is not None:
-            gamedev_api.declare_game_states(gs_enum, mapping, self)
+            self.engine.declare_game_states(gs_enum, mapping, self)
+
+        # this exists because using GameTpl class is >deprecated<
+        # one should rather use the launch_game.py script +3 basic functions in your gamedef that are:init,update,close
+        self.engine.preload_assets(
+            {'asset_list': [], 'sound_list': [], 'data_files': []},
+            prefix_asset_folder='assets/', prefix_sound_folder='./'
+        )
 
     def update(self, infot):
-        pyg = _hub.pygame
-        pk = pyg.key.get_pressed()
-        if pk[pyg.K_ESCAPE]:
-            self.gameover = True
-            return 2, self.nxt_game
-
+        pk = self.engine.get_pressed()
         self._manager.post(EngineEvTypes.Update, curr_t=infot)
         self._manager.post(EngineEvTypes.Paint, screen=engine_vars.screen)
         self._manager.update()
-        gamedev_api.flip()
+        self.engine.flip()
 
     def exit(self, vms=None):
-        gamedev_api.close_game()
+        self.engine.close_game()
 
     def loop(self):
         """
@@ -76,14 +78,14 @@ class GameTpl(metaclass=ABCMeta):
         if one wants to test a program without using the Kata VM
         :return:
         """
+        print('dans loop')
         # lock mechanism, for extra safety so we never call .loop() in the web ctx
         if self.SAFETY_LOCK:
             raise ValueError(self.ERR_LOCK_MSG)
 
         # use enter, update, exit to handle the global "run game logic"
         self.enter()
-
-        while not self.gameover:
+        while not engine_vars.gameover:
             infot = time.time()
             self.update(infot)
         self.exit()

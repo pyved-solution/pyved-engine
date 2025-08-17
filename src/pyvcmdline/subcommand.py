@@ -4,6 +4,7 @@ Contains the implementation of each and every sub_command that should be called 
 private function start with the character '_'
 """
 import importlib
+import importlib.util
 import json
 import os
 import shutil
@@ -14,36 +15,51 @@ from pprint import pprint as _pprint
 
 import requests
 
-from . import bundle_ops
+from . import cmdline_utils
 from . import cmdline_utils as _utils
 from . import opti_grab_bundle
 from . import server_ops as _netw, pyvcli_defs
 from . import tileset_creator as _ts_creator
-from .cmdline_utils import read_metadata, rewrite_metadata, MetadatEntries, \
-    test_isfile_in_cartridge
+from .cmdline_utils import read_metadata, rewrite_metadata, MetadatEntries, test_isfile_in_cartridge, load_metadata_format, fpath_join
+
+
+MODULE_WITH_SERV_CODE = 'netcode'  # module you should put inside the game bundle
+SCRIPT_WITH_SERV_CODE = 'run_server.py'
+SERV_CODE_START_FUNC = 'exec'
 
 
 # -------------------------
 #  private func
 # -------------------------
-def pack_game_cartridge(bundl_name, using_temp_dir=True) -> str:
+def pack_game_cartridge(bundl_name: str) -> str:
     """
-    @param bundl_name:
-    @param using_temp_dir:
-    @return: a path to the produced ZIP archive
+    @return: path to the produced ZIP archive
     """
+    OS_TEMP_DIRECTORY = tempfile.gettempdir()
+
     wrapper_bundle = os.path.join(os.getcwd(), bundl_name)
-    zip_precise_target = os.path.join(wrapper_bundle, 'cartridge')
+    # TODO distinguish hot bundle vs frozen
+    # if frozen:
+    # zip_precise_target = os.path.join(wrapper_bundle, 'cartridge')
+    # else:
+    zip_precise_target = wrapper_bundle
 
     def _inner_func(source_folder, wanted_zip_filename='output.zip'):
-        systmp_directory = tempfile.gettempdir()
-        output_zip_path = os.path.join(systmp_directory, wanted_zip_filename)
+        output_zip_path = os.path.join(OS_TEMP_DIRECTORY, wanted_zip_filename)
+
+        # Flag to check if any files are added to the zip
+        files_found = False
         with zipfile.ZipFile(output_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for root, _, files in os.walk(source_folder):
                 for file in files:
+                    files_found = True  # Found at least one file
                     file_path = os.path.join(root, file)
                     arcname = os.path.relpath(file_path, source_folder)
                     zipf.write(file_path, arcname)
+
+        # Raise an error if no files were added
+        if not files_found:
+            raise ValueError(f"No files found in the directory '{source_folder}' to pack into the ZIP.")
         return output_zip_path
 
     return _inner_func(zip_precise_target)
@@ -103,10 +119,10 @@ def _query_slug_availability(x):
     try:
         # error handling after ping the VMstorage remote service
         if slug_avail_serv_truth.status_code != 200:
-            raise Exception('[netw error] cannot reach the VMstorage service! Contact developers to report that bug please')
+            raise Exception('[netw error] cant reach the VMstorage service! Contact devs to report the bug, please')
         obj_serv_truth = slug_avail_serv_truth.json()
         if ('success' not in obj_serv_truth) or not obj_serv_truth['success']:
-            raise Exception('[protocol error] unexpected result after communication with VMstorage service. Contact devs')
+            raise Exception('[protocol error] unexpected result after comms with VMstorage service. Contact devs')
     except json.decoder.JSONDecodeError:
         print('Error! Cant decode reply from server...')
         print('url=', good_url)
@@ -139,11 +155,23 @@ def bump(bundle_name):
     """
     Nota Bene: operations bump, share automatically update the list of source files
     """
-    vx_with_dots = pyvcli_defs.read_ver()
-    print('bump bundle to current version, that is:', vx_with_dots)
+    active_engine_ver_wdots = pyvcli_defs.read_ver()
+    print('trying to bump to current version, that is', active_engine_ver_wdots)
+
     my_metadat = _utils.read_metadata(bundle_name)
-    my_metadat['dependencies']['pyved_engine'] = [vx_with_dots.replace('.', '_'), 'pyv']  # alias = pyv
-    _utils.rewrite_metadata(bundle_name, my_metadat)
+    if my_metadat['frozen']:
+        print('cannot bump a frozen game bundle, you will need to upgrade manually and with caution')
+    else:
+        good_idx = None
+        for k, elt in enumerate(my_metadat['dependencies']):
+            if elt[0] == 'pyved_engine':
+                good_idx = k
+                break
+        new_str = active_engine_ver_wdots.replace('.', '_')
+        my_metadat['dependencies'][good_idx][1] = new_str
+        my_metadat['build_date'] = cmdline_utils.gen_build_date_now()
+        # the alias that is the element of rank #2 probably stays the same, that is "pyv"
+        _utils.rewrite_metadata(bundle_name, my_metadat)
 
 
 def init(chosen_slug: str) -> None:
@@ -196,9 +224,11 @@ def init(chosen_slug: str) -> None:
         procedure_select_game_genre(metadata)
 
         # ensure to have registered the latest pyved_engine version +use the default alias:
-        metadata[MetadatEntries.Libs]['pyved_engine'] = [
-            vx_with_dots.replace('.', '_'), 'pyv'
-        ]  # defaut alias for the engine is "pyv"
+        metadata[MetadatEntries.Libs][0][1] = vx_with_dots.replace('.', '_')  # version bump
+        if len(metadata[MetadatEntries.Libs][0]) < 3:
+            metadata[MetadatEntries.Libs].append(None)
+        metadata[MetadatEntries.Libs][0][2]='pyv'  # set default alias for the engine is "pyv"
+
         rewrite_metadata(old_name, metadata, temp_dir)
 
         # Create the new dir, then move modified temp. files to the final destination
@@ -213,35 +243,44 @@ def init(chosen_slug: str) -> None:
     print('Go ahead and have fun ;)')
 
 
-def play(x, devflag_on):
-    if '.' != x and os.path.isdir('cartridge'):
+def play(bundle_name, **kwargs):
+    devflag_on = kwargs['dev']
+    print('dans la cmd', kwargs)
+    if '.' != bundle_name and os.path.isdir('cartridge'):
         raise ValueError('launching with a "cartridge" in the current folder, but no parameter "." is forbidden')
 
+    # ------------------------
+    #  just checking for errors, on metadat.json
+    # ------------------------
     metadata = None
     try:
-        with open(os.path.join(x, 'cartridge', 'metadat.json'), 'r') as fptr:
-            print(f"game bundle {x} found. Reading metadata...")
+        mdata_path = os.path.join(bundle_name, 'metadat.json')
+        with open(mdata_path, 'r') as fptr:
+            print(f"game bundle {bundle_name} found. Reading metadata...")
             metadata = json.load(fptr)
-        # - debug
-        # print('Metadata:\n', metadata)
-
-        # when ktg_services are enabled, we probably wish to set a user session (=login)
-        # this will help:
-        if metadata['ktg_services']:
-            _netw.do_login_via_terminal(metadata, not devflag_on)
-        sys.path.append(os.getcwd())
-        if x == '.':
-            vmsl = importlib.import_module(bundle_ops.RUNGAME_SCRIPT_NAME, None)
-        else:
-            vmsl = importlib.import_module('.' + bundle_ops.RUNGAME_SCRIPT_NAME, x)
-
     except FileNotFoundError:
-        print(f'Error: cannot find the game bundle you specified: {x}')
+        print(f'Error: cannot find the game bundle you specified: {bundle_name}')
         print('  Are you sure it exists in the current folder? Alternatively you can try to')
         print('  change directory (cd) and simply type `pyv-cli play`')
         print('  once you are inside the bundle')
-    if metadata:
-        vmsl.bootgame(metadata)
+
+    # - debug
+    # print('Metadata:\n', metadata)
+
+    # when ktg_services are enabled, we probably wish to set a user session (=login)
+    # this will help:
+    if metadata['ktg_services']:
+        _netw.do_login_via_terminal(metadata, not devflag_on)
+    sys.path.append(os.getcwd())
+    #if x == '.':
+    #    vmsl = importlib.import_module(bundle_ops.RUNGAME_SCRIPT_NAME, None)
+    #else:
+    from . import game_launcher as vmsl
+    # vmsl = importlib.import_module('.' + bundle_ops.RUNGAME_SCRIPT_NAME, x)
+
+    # At this point:
+    # assuming that metadata is available, and error-free... We can run boot_game
+    vmsl.boot_game(mdata_path, **kwargs)
 
 
 def refresh(bundle_name):
@@ -258,31 +297,93 @@ def refresh(bundle_name):
     _utils.rewrite_metadata(bundle_name, my_metadat)
 
 
-def share(bundle_name, dev_flag_on):
+def serve(bundle_name, **kwargs) -> None:
+    # Print the bundle name for debugging purposes.
+    print('>in serve sub-command...')
+    print('arg0:', bundle_name)
+    print('kwargs:', kwargs)
+    # Build the expected directory and file path for the server script.
+    server_dir = os.path.join(bundle_name, MODULE_WITH_SERV_CODE)
+    server_script_path = os.path.join(server_dir, SCRIPT_WITH_SERV_CODE)
+
+    print('pyved is looking for:', server_script_path)
+    if os.path.isfile(server_script_path):
+        if kwargs['dev']:
+            print("The developer flag is ON... Need to run server in development mode.")
+            print('For now, this does NOTHING-- but may be useful later on')
+        # Add the bundle directory to sys.path to allow package-relative imports.
+        bundle_abs_path = os.path.abspath(bundle_name)
+        if bundle_abs_path not in sys.path:
+            sys.path.insert(0, bundle_abs_path)
+
+        # TODO achiev this in web context aint that easy. How to overcome the challenge?
+        # ---start
+
+        # we 'll need to bind pyv to the 'wrapped' shared vars file
+        serv_glvars_module_desc = '.'.join((MODULE_WITH_SERV_CODE, 'shared_code', 'glvars'))
+        mvars = importlib.import_module(serv_glvars_module_desc)
+        from pyved_engine.EngineRouter import EngineRouter
+
+        mvars.pyv = EngineRouter()
+        mvars.pyv.bootstrap_e()
+        module_basename, ext = os.path.splitext(SCRIPT_WITH_SERV_CODE)
+        file_to_start_server = '.'.join((MODULE_WITH_SERV_CODE, module_basename))
+
+        print(f"using the server launcher {file_to_start_server}")
+        launcher_module = importlib.import_module(file_to_start_server)
+        if hasattr(launcher_module, SERV_CODE_START_FUNC):
+            if 'host' in kwargs and 'port' in kwargs:
+                getattr(launcher_module, SERV_CODE_START_FUNC)(**kwargs)  # forwardin kwargs to the server starter func
+            else:
+                raise ValueError('Error: you need to specify at least "host" and "port" to run a game server!')
+        else:
+            # error handling at level 2
+            print(f"Error: it appears the game doesn't support multiplayer properly \
+             (no {SERV_CODE_START_FUNC} function to be found in {SCRIPT_WITH_SERV_CODE}).")
+        # ---end
+
+    else:
+        # error handling at level 1
+        print(f"Error: no {SCRIPT_WITH_SERV_CODE} to be found in the bundle. Are you sure it's a multiplayer game?")
+
+
+def share(bundle_name: str, dev_flag: bool):
     # TODO in the future,
     #  we may want to create a 'pack' subcommand that would only produce the .zip, not send it elsewhere
     # that pack subcommand would pack and send it to the cwd, whereas the classic pack uses the tempfile/tempdir logic
 
-    # - refresh list of files
+    # - BOLLOKCS its a bad idea to do this. Plus for unknown reasons it may bump the pyv versions,
+    # =side effects
+
+    # deprec:refresh list of files
+    # metadat = _utils.read_metadata(bundle_name)
+    # _utils.save_list_of_py_files(os.path.join(bundle_name, 'cartridge'), metadat)
+    # rewrite_metadata(bundle_name, metadat)
+
     metadat = _utils.read_metadata(bundle_name)
-    _utils.save_list_of_py_files(os.path.join(bundle_name, 'cartridge'), metadat)
-    rewrite_metadata(bundle_name, metadat)
-
     slug = metadat['slug']
-    if dev_flag_on:  # in devmode, all tests on metadata are skipped
+    if dev_flag:  # in devmode, all tests on metadata are skipped
         zipfile_path = pack_game_cartridge(slug)
-        print(f'file:{zipfile_path} packed, uploading it now...')
-        _netw.upload_my_zip_file(zipfile_path, slug, True)
-        return
+        print(f'file:{zipfile_path} packed, uploading it now to the <LOCAL/DEVmode> pyVM component.')
 
-    err_msg_lines = [
-        'ERROR: the "share" is impossible yet, invalid metadat.json detected.',
-        'Please use "pyv-cli test BundleName"',
-        'in order to get more information and fix the problem'
-    ]
-    # if we're in prod mode, we HAVE TO pass all tests (slug is valid & available, etc.)
-    # before uploading
-    if _utils.verify_metadata(metadat) is None:
+    else:
+        err_msg_lines = [
+            'ERROR: the "share" is impossible yet, invalid metadat.json detected.',
+            'Please use "pyv-cli test BundleName"',
+            'in order to get more information and fix the problem'
+        ]
+        # if we're in prod mode, we HAVE TO pass all tests (slug is valid & available, etc.)
+        # before uploading
+        # TODO distingu: hot bundle vs frozen
+        # but for now let us assume all bundles are 'hot'
+        script_dir = os.path.dirname(os.path.realpath(__file__))
+        mtd_format = load_metadata_format(fpath_join(script_dir, 'spare_parts', 'metadat_format.json'))
+
+        if _utils.verify_metadata(metadat, mtd_format):  # if not None it implies an error
+            for msg_line in err_msg_lines:  # printing a multi-line error message
+                print(msg_line)
+            return
+
         slug_correctness = ensure_correct_slug(slug)
         while not slug_correctness[0]:
             tmp = input('what alternative do you choose (please select a number: 0 to 3)? ')
@@ -296,16 +397,17 @@ def share(bundle_name, dev_flag_on):
                 _utils.do_bundle_renaming(bundle_name, slug)
                 bundle_name = slug
         zipfile_path = pack_game_cartridge(bundle_name)
-        _netw.upload_my_zip_file(zipfile_path, slug, False)
-    else:
-        for msg_line in err_msg_lines:  # printing a multi-line error message
-            print(msg_line)
+
+    _netw.upload_my_zip_file(zipfile_path, slug, dev_flag)
 
 
 def test(bundle_name):
     print(f"Folder targetted to inspect game bundle: {bundle_name}")
     metadat = _utils.read_metadata(bundle_name)
-    err_message = _utils.verify_metadata(metadat)
+
+    print('hot bundle') if not metadat['frozen'] else print('bundle:frozen<<<')
+
+    err_message = _utils.verif_mdata_hot_bundle(metadat)
     if err_message is not None:
         raise ValueError(f'The metadata file has an invalid format! ({err_message})')
 

@@ -1,15 +1,13 @@
 """
-all elements in this sub-modules are imported directly
+"looparts" sands for LOOSE PARTS
 
-via Injector
-(dependency injection manager)
+All elements in this sub-module are imported only via Injector
+(our dependency injection manager)
 
-use the:
+So, follow guidelines and never import directly.
 
-  import katagames_sdk.engine as kataen
-  kataen.*
-
-syntax
+Another rule: elements in this sub-module have the right to access the engine router,
+to use basic chunks of code such as "events", or "custom_struct" and so on.
 """
 
 # N.b need to import so setup.py can detect all files

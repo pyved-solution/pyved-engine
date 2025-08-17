@@ -3,10 +3,13 @@ showcasing the "dummy game" but we make use of the MVC pattern here.
 This file will help you in understanding how the pattern should be applied to
 your particular game idea
 """
-import pyved_engine as pyv
-
+from pyved_engine import EngineRouter
+from pyved_engine.abstraction.PygameWrapper import PygameWrapper
+pyv = EngineRouter(PygameWrapper())
 
 pyv.bootstrap_e()
+
+
 # from katagames_engine.foundation.pbackends import build_primalbackend
 # ev2 = pyv.event2
 MyEvents = pyv.game_events_enum((
@@ -15,8 +18,7 @@ MyEvents = pyv.game_events_enum((
 ))
 
 # here we wish to showcase "demo using events+the mvc pattern"
-pygame = pyv.pygame
-EngineEvTypes = pyv.events.EngineEvTypes
+EngineEvTypes = pyv.EngineEvTypes
 
 
 # ------------------
@@ -69,7 +71,7 @@ class GameView(pyv.EvListener):
     def on_paint(self, ev):
         screen = pyv.get_surface()
         screen.fill(self.BG_COLOR)
-        pygame.draw.circle(ev.screen, self.pl_color, self.pl_screen_pos, 15, 0)
+        pyv.draw_circle(ev.screen, self.pl_color, self.pl_screen_pos, 15, 0)
 
 
 class DemoCtrl(pyv.EvListener):
@@ -90,19 +92,19 @@ class DemoCtrl(pyv.EvListener):
         pyv.vars.gameover = True
 
     def on_keyup(self, ev):
-        prkeys = pygame.key.get_pressed()
-        if (not prkeys[pygame.K_UP]) and (not prkeys[pygame.K_DOWN]):
+        prkeys = pyv.get_pressed()
+        if (not prkeys[pyv.keycodes.K_UP]) and (not prkeys[pyv.keycodes.K_DOWN]):
             self.state.av_y_speed = 0
 
     def on_keydown(self, ev):
-        if ev.key == pygame.K_ESCAPE:
+        if ev.key == pyv.keycodes.K_ESCAPE:
             pyv.vars.gameover = True
             print('dummy good bye')
-        elif ev.key == pygame.K_SPACE:
+        elif ev.key == pyv.keycodes.K_SPACE:
             self.state.switch_avatar_color()
-        elif ev.key == pygame.K_UP:
+        elif ev.key == pyv.keycodes.K_UP:
             self.state.av_y_speed = -1
-        elif ev.key == pygame.K_DOWN:
+        elif ev.key == pyv.keycodes.K_DOWN:
             self.state.av_y_speed = 1
 
 
@@ -129,7 +131,7 @@ def play_game():
         r.turn_on()  # listen to incoming events
     game_ctrl.loop()  # will automatically call .turn_on() on the game_ctrl,
     # then run a standard game loop
-    pyv.quit()
+    pyv.close_game()
 
 
 if __name__ == '__main__':

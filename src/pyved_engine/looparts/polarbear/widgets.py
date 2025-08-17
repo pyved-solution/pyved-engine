@@ -1,10 +1,12 @@
 from . import frects
 from . import image
-from ... import _hub
-pygame = _hub.pygame
+from ...concr_engin import core
 
 from .general import my_state, TEXT_COLOR, Border, default_border, wrap_with_records
 from .image import wrap_multi_line, draw_text
+
+
+pyv = core.ref_engine()
 
 # respond_event: Receives an event.
 #   If the widget has a method corresponding to the event,
@@ -44,21 +46,21 @@ class Widget(frects.Frect):
             for c in self.children:
                 c.respond_event(ev)
             if self.get_rect().collidepoint(my_state.mouse_pos):
-                if self.active and (ev.type == pygame.MOUSEBUTTONUP) and (
+                if self.active and (ev.type == pyv.evsys0.MOUSEBUTTONUP) and (
                         ev.button == 1) and not my_state.widget_clicked:
                     if not my_state.widget_clicked:
                         my_state.active_widget = self
                     if self.on_click:
                         self.on_click(self, ev)
                     my_state.widget_clicked = True
-                elif self.active and (ev.type == pygame.MOUSEBUTTONUP) and (
+                elif self.active and (ev.type == pyv.evsys0.MOUSEBUTTONUP) and (
                         ev.button == 3) and self.on_right_click and not my_state.widget_clicked:
                     if not my_state.widget_clicked:
                         my_state.active_widget = self
                     self.on_right_click(self, ev)
                     my_state.widget_clicked = True
             elif my_state.active_widget is self:
-                if self.on_click and (ev.type == pygame.KEYDOWN) and (ev.key in my_state.get_keys_for("click_widget")):
+                if self.on_click and (ev.type == pyv.evsys0.KEYDOWN) and (ev.key in my_state.get_keys_for("click_widget")):
                     self.on_click(self, ev)
                     my_state.widget_clicked = True
             self._builtin_responder(ev)
@@ -84,7 +86,7 @@ class Widget(frects.Frect):
             return (self is my_state.active_widget) and my_state.active_widget_hilight
 
     def _default_flash(self):
-        pygame.draw.rect(my_state.screen, ACTIVE_FLASH[my_state.anim_phase % len(ACTIVE_FLASH)], self.get_rect(), 1)
+        pyv.draw_rect(my_state.screen, ACTIVE_FLASH[my_state.anim_phase % len(ACTIVE_FLASH)], self.get_rect(), 1)
 
     def render(self, flash=False):
         if flash:
@@ -170,8 +172,8 @@ class TextEntryWidget(Widget):
 
     def _builtin_responder(self, ev):
         if my_state.active_widget is self:
-            if ev.type == pygame.KEYDOWN:
-                if (ev.key == pygame.K_BACKSPACE) and (len(self.char_list) > 0):
+            if ev.type == pyv.evsys0.KEYDOWN:
+                if (ev.key == pyv.evsys0.K_BACKSPACE) and (len(self.char_list) > 0):
                     del self.char_list[-1]
                     if self.on_change:
                         self.on_change(self, ev)
@@ -412,12 +414,12 @@ class ScrollColumnWidget(Widget):
         self._position_contents()
 
     def _builtin_responder(self, ev):
-        if (ev.type == pygame.MOUSEBUTTONDOWN) and self.get_rect().collidepoint(my_state.mouse_pos):
+        if (ev.type == pyv.evsys0.MOUSEBUTTONDOWN) and self.get_rect().collidepoint(my_state.mouse_pos):
             if (ev.button == 4):
                 self.scroll_up()
             elif (ev.button == 5):
                 self.scroll_down()
-        elif ((my_state.active_widget is self) or self.focus_locked) and (ev.type == pygame.KEYDOWN):
+        elif ((my_state.active_widget is self) or self.focus_locked) and (ev.type == pyv.evsys0.KEYDOWN):
             if ev.key in my_state.get_keys_for("click_widget"):
                 if self.active_widget < len(self._interior_widgets):
                     mybutton = self._interior_widgets[self.active_widget]
@@ -626,6 +628,7 @@ class TextEditorWidget(Widget):
             self.cursor_i += 1
 
     def _builtin_responder(self, ev):
+        pygame = pyv.evsys0
         if my_state.active_widget is self:
             if ev.type == pygame.KEYDOWN:
                 if (ev.key == pygame.K_BACKSPACE) and (len(self.char_list) > 0):

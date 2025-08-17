@@ -1,6 +1,12 @@
-import pyved_engine as pyv
-
+from pyved_engine.abstraction import PygameWrapper
+import pyved_engine
+# Step 4: (usage) Injecting the dependency explicitly:
+engine_depc = PygameWrapper()
+pyv = pyved_engine.EngineRouter(
+    engine_depc
+)
 pyv.bootstrap_e()
+
 
 # All constants
 BG_COLOR = 'antiquewhite2'
@@ -87,14 +93,14 @@ class PfDemoCtrl(pyv.EvListener):
         self.pev(pyv.EngineEvTypes.Gameover)
 
     def on_keydown(self, ev):
-        if ev.key == pyv.pygame.K_ESCAPE:
+        if ev.key == pyv.evsys0.K_ESCAPE:
             self.pev(pyv.EngineEvTypes.Gameover)
             print('envoi event Gameover')
 
-        elif ev.key == pyv.pygame.K_BACKSPACE:
+        elif ev.key == pyv.evsys0.K_BACKSPACE:
             self._m.last_res = None
 
-        elif ev.key == pyv.pygame.K_RETURN:
+        elif ev.key == pyv.evsys0.K_RETURN:
             print(DEBUG_MSG)
             pathfinding_result = pyv.terrain.DijkstraPathfinder.find_path(
                 self._m.the_map, self._m.start_pos, self._m.end_pos
@@ -102,19 +108,19 @@ class PfDemoCtrl(pyv.EvListener):
             print(pathfinding_result)
             self._m.last_res = pathfinding_result
 
-        elif ev.key == pyv.pygame.K_SPACE:
+        elif ev.key == pyv.evsys0.K_SPACE:
             i, j = self._m.cursor_pos
             new_bval = not self._m.the_map.get_val(i, j)
             self._m.the_map.set_val(i, j, new_bval)
             print('new value set on matrix:', new_bval)
 
-        elif ev.key == pyv.pygame.K_UP:
+        elif ev.key == pyv.evsys0.K_UP:
             self.move_cursor('up')
-        elif ev.key == pyv.pygame.K_DOWN:
+        elif ev.key == pyv.evsys0.K_DOWN:
             self.move_cursor('down')
-        elif ev.key == pyv.pygame.K_LEFT:
+        elif ev.key == pyv.evsys0.K_LEFT:
             self.move_cursor('left')
-        elif ev.key == pyv.pygame.K_RIGHT:
+        elif ev.key == pyv.evsys0.K_RIGHT:
             self.move_cursor('right')
 
 
@@ -139,5 +145,5 @@ class DemoPathfinding(pyv.GameTpl):
 
 
 if __name__ == '__main__':
-    gobj = DemoPathfinding()
+    gobj = DemoPathfinding(pyv)
     gobj.loop()

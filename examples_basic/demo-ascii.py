@@ -1,7 +1,10 @@
-import pyved_engine as pyv
-
-
+"""
+testing the .ascii pyv submodule
+"""
+from pyved_engine import EngineRouter
+pyv = EngineRouter.build()
 pyv.bootstrap_e()
+
 
 # - const
 CAR_SIZE = 12  # 20, 16, 12, 10, 8 vont fonctionner si c'est le mode HD de pyv qui est actif
@@ -12,7 +15,6 @@ Y_PAL_POS = 15
 PAL = pyv.pal.c64
 
 # - variables
-pygame = pyv.pygame
 ajouts = dict()
 asc_canvas = canv_bsupx = canv_bsupy = None
 
@@ -26,7 +28,7 @@ _scr = None
 # -- before starting the main program
 def init_game():
     global _scr, asc_canvas, canv_bsupx, canv_bsupy
-    pyv.init()  # pyv.LOW_RES_MODE)
+    pyv.init(1)  # pyv.LOW_RES_MODE)
     asc_canvas = pyv.ascii
     asc_canvas.init(CAR_SIZE)
     canv_bsupx, canv_bsupy = asc_canvas.get_bounds()
@@ -34,20 +36,22 @@ def init_game():
 
 
 def game_loop():
-    global asc_canvas
-    while not pyv.vars.gameover:
-        for ev in pyv.evsys0.get():
-            if ev.type == pygame.QUIT or (ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE):
-                pyv.vars.gameover = True
-            elif ev.type == pygame.MOUSEBUTTONDOWN:
-                text_pos = list(pyv.ascii.screen_to_cpos(ev.pos))
-            elif ev.type == pygame.KEYDOWN:
+    global asc_canvas, text_pos
 
-                if ev.key == pygame.K_BACKSPACE:
+    while not pyv.vars.gameover:
+        for ev in pyv.event_get():
+            print(ev)
+            if ev.type == pyv.EngineEvTypes.Quit or (ev.type == pyv.KEYDOWN and ev.key == pyv.keycodes.K_ESCAPE):
+                pyv.vars.gameover = True
+            elif ev.type == pyv.EngineEvTypes.Mousedown:
+                text_pos = list(pyv.ascii.screen_to_cpos(ev.pos))
+            elif ev.type == pyv.EngineEvTypes.Keydown:
+
+                if ev.key == pyv.keycodes.K_BACKSPACE:
                     pyv.ascii.increm_char_size()
                     text_pos = None
 
-                elif text_pos is not None and ev.key != pygame.K_RETURN:
+                elif text_pos is not None and ev.key != pyv.keycodes.K_RETURN:
                     cle = tuple(text_pos)
                     if cle not in ajouts:
                         ajouts[cle] = list()
@@ -76,7 +80,7 @@ def game_loop():
             if len(aj):
                 tmp_pos = list(adhoc_tpos)
                 for e in list(aj):  # letter one by one
-                    tmp = asc_canvas.put_char(e, tmp_pos, PAL[3], PAL['darkgrey'])
+                    tmp = asc_canvas.put_char(e, tmp_pos, PAL[3], PAL['darkgray'])
                     tmp_pos[0] += 1
 
         # draw the cursor
@@ -99,4 +103,4 @@ if __name__ == '__main__':
     print('running tests (pyv.ascii)')
     init_game()
     game_loop()
-    pyv.quit()
+    pyv.close_game()

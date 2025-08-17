@@ -1,12 +1,12 @@
 import weakref
 from itertools import chain
-from ... import vars
-from ... import _hub
+from ...concr_engin import core
 
+
+pyv = core.ref_engine()
 
 DEFAULT_COLOR_KEY = (255, 0, 255)
 TEXT_COLOR = (240, 240, 50)
-pygame = _hub.pygame
 # Keep a list of already-loaded images, to save memory when multiple objects
 # need to use the same image file.
 pre_loaded_images = weakref.WeakValueDictionary()
@@ -105,7 +105,7 @@ def render_text(font, text, width, color=TEXT_COLOR, justify=-1, antialias=True,
 
     imgs = [font.render(l, antialias, color) for l in lines]
     h = sum(i.get_height() for i in imgs)
-    s = pygame.surface.Surface((width, h))
+    s = pyv.surface_create((width, h))
     s.fill((0, 0, 0))
     o = 0
     for i in imgs:
@@ -123,7 +123,7 @@ def render_text(font, text, width, color=TEXT_COLOR, justify=-1, antialias=True,
         o += i.get_height()
 
     if moff is None:
-        s.set_colorkey((0, 0, 0), pygame.RLEACCEL)
+        s.set_colorkey((0, 0, 0), pyv.RLEACCEL)
         return s
 
 
@@ -132,22 +132,20 @@ def draw_text(font, text, rect, color=TEXT_COLOR, justify=-1, antialias=True, de
     if dest_surface:
         dsu = dest_surface
     else:
-        dsu = vars.screen
+        dsu = pyv.get_surface()
 
     # myimage = render. ...
     render_text(font, text, rect.width, color, justify, antialias, dsuu=dsu, moff=rect.topleft)
     return
-
-    if justify == 0:
-        myrect = myimage.get_rect(midtop=rect.midtop)
-    elif justify > 0:
-        myrect = myimage.get_rect(topleft=rect.topleft)
-    else:
-        myrect = rect
-
-    dsu.set_clip(rect)
-    dsu.blit(myimage, myrect)
-    dsu.set_clip(None)
+    # if justify == 0:
+    #     myrect = myimage.get_rect(midtop=rect.midtop)
+    # elif justify > 0:
+    #     myrect = myimage.get_rect(topleft=rect.topleft)
+    # else:
+    #     myrect = rect
+    # dsu.set_clip(rect)
+    # dsu.blit(myimage, myrect)
+    # dsu.set_clip(None)
 
 
 class Image(object):
@@ -157,14 +155,14 @@ class Image(object):
         if fname:
             self.bitmap = self.get_pre_loaded(fname, transparent)
             if not self.bitmap:
-                self.bitmap = vars.images[fname]
+                self.bitmap = pyv.images[fname]
                 self.bitmap.set_colorkey(color_key, flags)
         else:
-            self.bitmap = pygame.Surface((frame_width, frame_height))
+            self.bitmap = pyv.surface_create((frame_width, frame_height))
             self.bitmap.fill(color_key)
             self.bitmap.set_colorkey(color_key, flags)
 
-        self.scrref = vars.screen
+        self.scrref = pyv.get_surface()
 
         self.fname = fname
         self.flags = flags
@@ -199,12 +197,12 @@ class Image(object):
 
     def _get_frame_area(self, frame):
         if self.custom_frames and frame < len(self.custom_frames):
-            area = pygame.Rect(self.custom_frames[frame])
+            area = pyv.new_rect_obj(self.custom_frames[frame])
         else:
             frames_per_row = self.bitmap.get_width() // self.frame_width
             area_x = (frame % frames_per_row) * self.frame_width
             area_y = (frame // frames_per_row) * self.frame_height
-            area = pygame.Rect(area_x, area_y, self.frame_width, self.frame_height)
+            area = pyv.new_rect_obj(area_x, area_y, self.frame_width, self.frame_height)
         return area
 
     def render(self, dest=(0, 0), frame=0, dest_surface=None ):
@@ -221,7 +219,7 @@ class Image(object):
 
         dest_c = self.get_rect(frame)
         dest_c.center = dest
-        dest_surface = dest_surface or vars.screen  # new way to retrieve the surface used for display
+        dest_surface = dest_surface or pyv.get_surface()  # new way to retrieve the surface used for display
 
         dest_surface.blit(self.bitmap, dest_c, area)
 
@@ -233,9 +231,9 @@ class Image(object):
     def get_rect(self, frame):
         # Return a rect of the correct size for this frame.
         if self.custom_frames and frame < len(self.custom_frames):
-            return pygame.Rect(0, 0, self.custom_frames[frame][2], self.custom_frames[frame][3])
+            return pyv.new_rect_obj(0, 0, self.custom_frames[frame][2], self.custom_frames[frame][3])
         else:
-            return pygame.Rect(0, 0, self.frame_width, self.frame_height)
+            return pyv.new_rect_obj(0, 0, self.frame_width, self.frame_height)
 
     def num_frames(self):
         if self.custom_frames:
@@ -258,7 +256,7 @@ class Image(object):
         grid_w = dest.w // self.frame_width + 2
         grid_h = dest.h // self.frame_height + 2
         dest_surface.set_clip(dest)
-        my_rect = pygame.Rect(0, 0, 0, 0)
+        my_rect = pyv.new_rect_obj(0, 0, 0, 0)
 
         for x in range(-1, grid_w):
             my_rect.x = dest.x + x * self.frame_width +x_offset

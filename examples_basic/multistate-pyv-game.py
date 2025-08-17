@@ -6,7 +6,7 @@ based on event sys 4
 import pyved_engine as pyv
 
 pyv.bootstrap_e()
-pygame = pyv.pygame
+
 StackBasedGameCtrl = pyv.state_management.StateStackCtrl
 EngineEvTypes = pyv.events.EngineEvTypes
 ReceiverObj = pyv.events.EvListener
@@ -39,18 +39,18 @@ class Room1Manager(ReceiverObj):
 
         elif ev.type == EngineEvTypes.Paint:
             ev.screen.fill(BG_COLOR_ROOM1)
-            pygame.draw.circle(
+            pyv.draw_circle(
                 ev.screen, PL_COLOR, self.av_pos, 15, 0
             )
 
         elif ev.type == EngineEvTypes.Keydown:
             print('KKK')
-            if ev.key == pygame.K_SPACE:
+            if ev.key == pyv.evsys0.K_SPACE:
                 self.fresh_st = False
                 self.pev(EngineEvTypes.StatePush, state_ident=GameStates.Room2)
-            elif ev.key == pygame.K_RETURN and not self.fresh_st:
+            elif ev.key == pyv.evsys0.K_RETURN and not self.fresh_st:
                 self.pev(EngineEvTypes.StatePush, state_ident=GameStates.Room2)
-            elif ev.key == pygame.K_ESCAPE:
+            elif ev.key == pyv.evsys0.K_ESCAPE:
                 self.pev(EngineEvTypes.Gameover)
 
 
@@ -87,15 +87,15 @@ class Room2Manager(ReceiverObj):
         self.av_pos[1] = (self.av_pos[1] - 1) % self.scr_size[1]
 
     def on_keydown(self, ev):
-        if ev.key == pygame.K_BACKSPACE:
+        if ev.key == pyv.evsys0.K_BACKSPACE:
             print('pop state')
             self.pev(EngineEvTypes.StatePop)
-        elif ev.key == pygame.K_ESCAPE:
+        elif ev.key == pyv.evsys0.K_ESCAPE:
             self.pev(EngineEvTypes.Gameover)
 
     def on_paint(self, ev):
         ev.screen.fill(BG_COLOR_ROOM2)
-        pygame.draw.circle(
+        pyv.evsys0.draw.circle(
             ev.screen, (PL_COLOR[2], PL_COLOR[0], PL_COLOR[1]), self.av_pos, 37, 0
         )
 

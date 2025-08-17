@@ -7,18 +7,18 @@ import glob
 import json
 import random
 import re
-
-from .. import _hub
-from .. import core
-from .. import vars as pyv_vars
-from .. import vscreen
-from ..core.events import EvListener, EngineEvTypes
-from ..gamedev_api.highlevel import new_actor, post_ev, get_surface, new_font_obj, peek
+# from .. import pe_vars as _vars
+# from ..foundation.events import EvListener, EngineEvTypes
+from ..actors_pattern import new_actor, peek
 
 
 # - aliases
-pygame = _hub.pygame  # alias to keep on using pygame, easily
-polarbear = _hub.polarbear
+# pygame = _hub.pygame  # alias to keep on using pygame, easily
+from .. import core
+
+pyv = core.ref_engine()
+polarbear = pyv.polarbear
+
 pbear_frects_mod = polarbear.frects
 Frect = pbear_frects_mod.Frect
 default_border = polarbear.default_border
@@ -146,7 +146,7 @@ def new_automaton_viewer(li_automata, fontname=None):
 
     # we have to pass args differently...
     ref_automaton = Automaton(
-        *[(automaton_name, pyv_vars.data[automaton_name]) for automaton_name in li_automata]
+        *[(automaton_name, pyv.data[automaton_name]) for automaton_name in li_automata]
     )
     # declare what actor contains
     data = {
@@ -251,13 +251,13 @@ class MenuItem(object):
 #             pyv.vars.blit(img, mydest)
 
 
-class Menu(EvListener, Frect):  # N.B (tom) it would be better to inherit from EventReceiver +have a Frect attribute
+class Menu(pyv.EvListener, Frect):  # N.B (tom) it would be better to inherit from EventReceiver +have a Frect attribute
 
     def __init__(self, dx, dy, font, w=300, h=100, anchor=ANCHOR_CENTER, menuitem=MENU_ITEM_COLOR,
                  menuselect=MENU_SELECT_COLOR, border=default_border, predraw=None, padding=0,
                  item_class=MenuItem, antialias=False):
         # lets use multiple inheritance
-        EvListener.__init__(self)
+        pyv.EvListener.__init__(self)
         Frect.__init__(self, dx, dy, w, h, anchor)
 
         self.menuitem = menuitem
@@ -266,7 +266,7 @@ class Menu(EvListener, Frect):  # N.B (tom) it would be better to inherit from E
         if font:
             self.font = font
         else:
-            self.font = new_font_obj(None, DEFAULT_FONT_SIZE_CONV_MENU)
+            self.font = pyv.new_font_obj(None, DEFAULT_FONT_SIZE_CONV_MENU)
         self.antialias_flag = antialias
 
         self.more_image = self.font.render("+", self.antialias_flag, menuselect)
@@ -287,7 +287,7 @@ class Menu(EvListener, Frect):  # N.B (tom) it would be better to inherit from E
         # redraws/clears the screen before the menu is rendered.
         self.predraw = predraw
 
-        self.screen = get_surface()
+        self.screen = pyv.get_surface()
 
         # -> to the model
         self.no_choice_made = True
@@ -308,7 +308,7 @@ class Menu(EvListener, Frect):  # N.B (tom) it would be better to inherit from E
         y = mydest.top
         while y < mydest.bottom:
             if item_num < len(self.items):
-                itemdest = pygame.Rect(mydest.x, y, self.w, self.items[item_num].height)
+                itemdest = pyv.new_rect_obj(mydest.x, y, self.w, self.items[item_num].height)
                 # Only add this item to the menu if it fits inside the menu or is the first menu item.
                 if itemdest.bottom <= mydest.bottom or not self._item_rects:
                     self._item_rects[item_num] = itemdest
@@ -370,7 +370,7 @@ class Menu(EvListener, Frect):  # N.B (tom) it would be better to inherit from E
         self.arrange()
 
     def on_paint(self, ev):
-        if ev.type == EngineEvTypes.Paint:
+        if ev.type == pyv.EngineEvTypes.Paint:
             self.render()
 
     # - deprecated
@@ -408,8 +408,7 @@ class Menu(EvListener, Frect):  # N.B (tom) it would be better to inherit from E
 
     def on_mousedown(self, ev):
         if ev.button == 1:
-            mouse_pos = vscreen.proj_to_vscreen(pygame.mouse.get_pos())
-
+            mouse_pos = pyv.get_mouse_coords()
             moi = self.get_mouseover_item(mouse_pos)
             if moi is not None:
                 self.set_item_by_position(moi)
@@ -419,21 +418,22 @@ class Menu(EvListener, Frect):  # N.B (tom) it would be better to inherit from E
             self.top_item = min(self.top_item + 1, self._the_highest_top)
 
     def on_mouseup(self, ev):
-        mouse_pos = vscreen.proj_to_vscreen(pygame.mouse.get_pos())
+        #mouse_pos = vscreen.proj_to_vscreen(pyv.get_mouse_pos())
+        mouse_pos = pyv.get_mouse_coords()
         if ev.button == 1:
             moi = self.get_mouseover_item(mouse_pos)
             if moi is self.selected_item:
                 # avant transition vers automaton
                 # self.pev(MyEvTypes.ConvChoice, value=self.items[self.selected_item].value)
                 # après:
-                self.pev(EngineEvTypes.ConvStep, value=self.items[self.selected_item].msg)
-                post_ev('conv_step', value=self.items[self.selected_item].msg)
+                self.pev(pyv.EngineEvTypes.ConvStep, value=self.items[self.selected_item].msg)
+                pyv.post_ev('conv_step', value=self.items[self.selected_item].msg)
                 self.no_choice_made = False
         elif ev.button == 3 and self.can_cancel:
             self.no_choice_made = False
 
     def on_mousemotion(self, ev):
-        mouse_pos = vscreen.proj_to_vscreen(pygame.mouse.get_pos())  # still need to convert!
+        mouse_pos = pyv.get_mouse_coords()
         moi = self.get_mouseover_item(mouse_pos)
         if moi is not None:
             self.set_item_by_position(moi)
@@ -502,11 +502,11 @@ class PopUpMenu(Menu):
     """Creates a small menu at the current mouse position."""
 
     def __init__(self, w=200, h=250, predraw=None, border=default_border, **kwargs):
-        mouse_pos = core.proj_to_vscreen(pygame.mouse.get_pos())
+        mouse_pos = pyv.get_mouse_coords()
         x, y = mouse_pos
         x += 8
         y += 8
-        sw, sh = pyv_vars.screen.get_size()
+        sw, sh = pyv.screen.get_size()
         if x + w + 32 > sw:
             x += -w - 32
         if y + h + 32 > sh:
@@ -608,17 +608,17 @@ def new_conversation_view_actor(ref_automaton, font_name):
         'my_menu': None,  # to store possible answers
         'up_to_date': False,
         'antialias': False,
-        'font': new_font_obj(None, DEFAULT_FONT_SIZE_CONV_MENU) if font_name is None else pyv_vars.data[font_name],
+        'font': pyv.new_font_obj(None, DEFAULT_FONT_SIZE_CONV_MENU) if font_name is None else pyv.data[font_name],
         'pre_render': None,
         'ready_to_leave': False,
         'active': False
     }
     img_id = data['automaton'].inner_data['portrait']
-    data['portrait'] = pyv_vars.images[img_id] if img_id else None
+    data['portrait'] = pyv.images[img_id] if img_id else None
 
     # - utils
     def refresh_portrait(this, img_name):
-        this.portrait = pyv_vars.images[img_name] if img_name else None
+        this.portrait = pyv.images[img_name] if img_name else None
 
     # --------------
     # - behavior
@@ -631,7 +631,7 @@ def new_conversation_view_actor(ref_automaton, font_name):
         automaton_sig = this.automaton.handle_input(ev.value)
         if automaton_sig == 0:
             this.ready_to_leave = True
-            post_ev('conv_finish')
+            pyv.post_ev('conv_finish')
         elif automaton_sig == 2:
             # update portrait if needed
             refresh_portrait(this, this.automaton.inner_data['portrait'])
@@ -695,12 +695,12 @@ def new_conversation_view_actor(ref_automaton, font_name):
 
 
 # - deprecated!
-class deprecConversationView(EvListener):
+class deprecConversationView(pyv.EvListener):
     # The visualizer is a class used by the conversation when conversing.
     # It has a "text" property and "render", "get_menu" methods.
 
     def _refresh_portrait(self, x):
-        self.portrait = pyv_vars.images[x] if x else None
+        self.portrait = pyv.images[x] if x else None
 
     def __init__(self, ref_automaton, font_name=None, antialias=False, pre_render=None):
         super().__init__()
@@ -710,14 +710,14 @@ class deprecConversationView(EvListener):
         self._refresh_portrait(ref_automaton.inner_data['portrait'])
 
         self.pre_render = pre_render
-        self.font = pyv_vars.data[font_name] if font_name else new_font_obj(None, DEFAULT_FONT_SIZE_CONV_MENU)  # using pre-load via engine
+        self.font = pyv.data[font_name] if font_name else pyv.new_font_obj(None, DEFAULT_FONT_SIZE_CONV_MENU)  # using pre-load via engine
 
         # cela equivaut à curr_state
         # self.curr_offer = root_offer
         self.dialog_upto_date = False
         self.existing_menu = None
         self.antialias_flag = antialias
-        self.screen = get_surface()
+        self.screen = pyv.get_surface()
         self.ready_to_leave = False
 
     def turn_off(self):  # because the conversation view can be closed from "outside" i.e. the main program
@@ -758,7 +758,7 @@ class deprecConversationView(EvListener):
             #    nextfx()
         else:
             # auto-close everything
-            self.pev(EngineEvTypes.ConvFinish)
+            self.pev(pyv.EngineEvTypes.ConvFinish)
             self.turn_off()
 
     def on_conv_step(self, ev):

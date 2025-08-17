@@ -1,6 +1,10 @@
 import abc
+from .concr_engin.core import underscore_format
 
-from .util import underscore_format
+
+class Objectifier:
+    def __init__(self, data):
+        self.__dict__.update(data)
 
 
 def enum_builder_generic(to_upper, starting_index, *sequential, **extra_manset_codes):
@@ -53,9 +57,9 @@ def enum(*sequential, **named):
 class abstractclassmethod(classmethod):
     __isabstractmethod__ = True
 
-    def __init__(self, callable):
-        callable.__isabstractmethod__ = True
-        super(abstractclassmethod, self).__init__(callable)
+    def __init__(self, fcallable):
+        fcallable.__isabstractmethod__ = True
+        super(abstractclassmethod, self).__init__(fcallable)
 
 
 # ------------------------------- matrices -------------------------------
