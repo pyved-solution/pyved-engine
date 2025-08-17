@@ -252,34 +252,35 @@ def play(bundle_name, **kwargs):
     # ------------------------
     #  just checking for errors, on metadat.json
     # ------------------------
-    mdata_path = os.path.join(bundle_name, 'metadat.json')
+    metadata = None
     try:
+        mdata_path = os.path.join(bundle_name, 'metadat.json')
         with open(mdata_path, 'r') as fptr:
             print(f"game bundle {bundle_name} found. Reading metadata...")
             metadata = json.load(fptr)
-        # - debug
-        # print('Metadata:\n', metadata)
-
-        # when ktg_services are enabled, we probably wish to set a user session (=login)
-        # this will help:
-        if metadata['ktg_services']:
-            _netw.do_login_via_terminal(metadata, not devflag_on)
-        sys.path.append(os.getcwd())
-        #if x == '.':
-        #    vmsl = importlib.import_module(bundle_ops.RUNGAME_SCRIPT_NAME, None)
-        #else:
-        from . import game_launcher as vmsl
-        # vmsl = importlib.import_module('.' + bundle_ops.RUNGAME_SCRIPT_NAME, x)
-
-        # At this point:
-        # assuming that metadata is available, and error-free... We can run boot_game
-        vmsl.boot_game(mdata_path, **kwargs)
-
     except FileNotFoundError:
         print(f'Error: cannot find the game bundle you specified: {bundle_name}')
         print('  Are you sure it exists in the current folder? Alternatively you can try to')
         print('  change directory (cd) and simply type `pyv-cli play`')
         print('  once you are inside the bundle')
+
+    # - debug
+    # print('Metadata:\n', metadata)
+
+    # when ktg_services are enabled, we probably wish to set a user session (=login)
+    # this will help:
+    if metadata['ktg_services']:
+        _netw.do_login_via_terminal(metadata, not devflag_on)
+    sys.path.append(os.getcwd())
+    #if x == '.':
+    #    vmsl = importlib.import_module(bundle_ops.RUNGAME_SCRIPT_NAME, None)
+    #else:
+    from . import game_launcher as vmsl
+    # vmsl = importlib.import_module('.' + bundle_ops.RUNGAME_SCRIPT_NAME, x)
+
+    # At this point:
+    # assuming that metadata is available, and error-free... We can run boot_game
+    vmsl.boot_game(mdata_path, **kwargs)
 
 
 def refresh(bundle_name):
