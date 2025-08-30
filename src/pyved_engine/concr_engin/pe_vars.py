@@ -20,7 +20,7 @@ import re
 
 
 # CONSTANTS
-ENGINE_VERSION_STR = '25.4a1'  # should be readable via pyv.get_version()
+ENGINE_VERSION_STR = '25.8a1'  # should be readable via pyv.get_version()
 DATA_FT_SIZE = 16
 BASE_ENGINE_EVS = [
     'update', 'draw',
